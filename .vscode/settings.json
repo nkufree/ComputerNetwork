@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.l": "lex",
+        "iostream": "cpp",
+        "ostream": "cpp",
+        "iosfwd": "cpp",
+        "system_error": "cpp",
+        "fstream": "cpp",
+        "new": "cpp"
+    }
+}

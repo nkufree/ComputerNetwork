@@ -84,7 +84,7 @@ bool RecvFile::init_connect()
 
 bool RecvFile::send_message(int len)
 {
-    cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
+    cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len  << endl;
     sendMsg_->head.seq = recvMsg_->head.seq;
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sockRecv_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
@@ -99,7 +99,7 @@ int RecvFile::recv_message()
     {
         if((len = recvfrom(sockRecv_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_)) == SOCKET_ERROR)
             return len;
-        cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len << endl;
+        cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len - sizeof(info) << endl;
         uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
         if(check_crc32 != recvMsg_->head.crc32)
             continue;

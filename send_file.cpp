@@ -102,7 +102,7 @@ int SendFile::recv_message()
         if((len = recvfrom(sockSend_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_)) == SOCKET_ERROR)
             return len;
         else 
-            cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len << endl;
+            cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len - sizeof(info) << endl;
     }
     else
     {

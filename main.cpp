@@ -76,5 +76,7 @@ int main(int argc, char* argv[])
             cout << "接收文件成功" << endl;
         }
     }
+    cout << endl << "按任意键退出……" << endl;
+    cin.get();
     return 0;
 }

@@ -5,11 +5,12 @@
 using namespace std;
 
 char sendIP[20] = {SEND_IP};
+char routerIP[20] = {ROUTER_IP};
 char recvIP[20] = {RECV_IP};
 
 bool sendFile(char* fileName)
 {
-    SendFile* send = new SendFile(sendIP, recvIP, SEND_PORT, RECV_PORT);
+    SendFile* send = new SendFile(sendIP, routerIP, SEND_PORT, ROUTER_PORT);
     bool ret;
     ret = send->init();
     if(ret == false) goto send_falied;
@@ -24,7 +25,7 @@ send_falied:
 
 bool recvFile()
 {
-    RecvFile* recv = new RecvFile(sendIP, recvIP, SEND_PORT, RECV_PORT);
+    RecvFile* recv = new RecvFile(routerIP, recvIP, ROUTER_PORT, RECV_PORT);
     bool ret;
     ret = recv->init();
     if(ret == false) goto recv_falied;
@@ -50,9 +51,9 @@ int main(int argc, char* argv[])
     cin.get();
     if(sel == 1)
     {
-        char fileName[MAX_SEND_SIZE] = {};
+        char fileName[MSS] = {};
         cout << "请输入文件名：";
-        cin.getline(fileName, MAX_SEND_SIZE - 1);
+        cin.getline(fileName, MSS - 1);
         bool ret = sendFile(fileName);
         if(ret == false)
         {

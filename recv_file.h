@@ -19,6 +19,7 @@ private:
     int addrSize_;
     timeval start_, end_;
     std::ofstream recvFileStream_;
+    states state_;
     bool init_connect();
     bool recv_file_name();
     bool send_message(int len); // 完成设置seq、计算校验码、发送消息、消息重传

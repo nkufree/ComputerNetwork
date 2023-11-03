@@ -6,6 +6,7 @@
         "iosfwd": "cpp",
         "system_error": "cpp",
         "fstream": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "cstdint": "cpp"
     }
 }

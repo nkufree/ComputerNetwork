@@ -20,6 +20,7 @@ private:
     std::ifstream sendFileStream_;
     int addrSize_;
     timeval tv_;
+    states state_;
     bool init_connect();
     void set_wait_time(int t);
     bool send_file_name(const char* fileName);

@@ -1,6 +1,7 @@
 #ifndef __CRC32_H__
 #define __CRC32_H__
 #include <iostream>
+#include <cstdint>
 static const uint32_t crc32tab[] =
 {
 	0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL,

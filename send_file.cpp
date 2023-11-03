@@ -74,6 +74,7 @@ bool SendFile::init_connect()
 bool SendFile::send_message(int len)
 {
     if(len < 0) return 1;
+    cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
     sendMsg_->head.seq = get_seq();
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sockSend_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
@@ -84,6 +85,7 @@ bool SendFile::send_message(int len)
 bool SendFile::resend_message(int len)
 {
     if(len < 0) return 1;
+    cout << "[重新发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
     if(sendto(sockSend_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
         return 0;
     return 1;
@@ -99,6 +101,8 @@ int SendFile::recv_message()
     {
         if((len = recvfrom(sockSend_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_)) == SOCKET_ERROR)
             return len;
+        else 
+            cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len << endl;
     }
     else
     {
@@ -280,7 +284,7 @@ bool SendFile::send(const char* fileName)
     int ret;
     while(wait_send_len > 0)
     {
-        int send_len = wait_send_len <= MAX_SEND_SIZE ? wait_send_len : MAX_SEND_SIZE;
+        int send_len = wait_send_len <= MSS ? wait_send_len : MSS;
         sendMsg_->head.flag = PSH;
         sendFileStream_.read(sendMsg_->msg, send_len);
         ret = send_and_wait(send_len);

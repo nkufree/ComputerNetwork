@@ -59,10 +59,8 @@ enum states     // 状态
 struct info
 {
     uint32_t crc32;
-    uint32_t seq;
-    uint32_t ack;
-    WORD flag;
-    WORD win;
+    BYTE flag;
+    BYTE seq;
 };
 struct fileMessage
 {

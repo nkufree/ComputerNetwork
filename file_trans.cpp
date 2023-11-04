@@ -25,18 +25,13 @@ RC FileTrans::recvMsg(int &len)
 {
     RC rc = RC::SUCCESS;
     len = recvfrom(sock_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_);
-    cout << "[ recv ] [ seq ] = " << recvMsg_->head.seq << " [ flag ] = 0x" << hex << recvMsg_->head.flag << " [ len ] = " << dec << len - sizeof(info)  << " [ state ] = " << stateName[state_] << endl;
+    cout << "[ recv ] [ seq ] = " << (int)recvMsg_->head.seq << " [ flag ] = 0x" << hex << (int)recvMsg_->head.flag << " [ len ] = " << dec << len - sizeof(info)  << " [ state ] = " << stateName[state_] << endl;
     if(len == SOCKET_ERROR)
         return RC::SOCK_ERROR;
     uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
     if(check_crc32 != recvMsg_->head.crc32)
         return RC::CHECK_ERROR;
-    WORD& flag = recvMsg_->head.flag;
-    if(flag == RST)
-    {
-        state_ = LISTEN;
-        return RC::SUCCESS;
-    }
+    auto& flag = recvMsg_->head.flag;
     switch(state_)
     {
         case CLOSED:        // 传输已完成，需要重新建立连接
@@ -50,10 +45,12 @@ RC FileTrans::recvMsg(int &len)
                 sendMsg_->head.flag = SYN | ACK;
             else if(flag == (SYN | ACK))
                 sendMsg_->head.flag = ACK;
+            else state_ = LISTEN;
             break;
         case SYN_RCVD:      // 接收端发送第二次握手
             if(flag == ACK)
                 state_ = ESTABLISHED;
+            else state_ = LISTEN;
             break;
         case ESTABLISHED:   // 数据传输状态
             if(flag == FIN)
@@ -68,14 +65,18 @@ RC FileTrans::recvMsg(int &len)
                 state_ = FIN_WAIT_2;
             else if(flag == (FIN | ACK))
                 sendMsg_->head.flag = ACK;
+            else
+                state_ = ESTABLISHED;
             break;
         case LAST_ACK:      // 第三次挥手后
             if(flag == ACK)
                 state_ = CLOSED;
+            else state_ = ESTABLISHED;
             break;
         case FIN_WAIT_2:    // 收到第二次挥手后，等待第三次挥手
             if(flag == (FIN | ACK))
                 sendMsg_->head.flag = ACK;
+            else state_ = ESTABLISHED;
             break;
         default:
             return RC::INTERNAL;
@@ -92,7 +93,7 @@ RC FileTrans::sendMsg(int len, int seq)
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
         return RC::SOCK_ERROR;
-    cout << "[ send ] [ seq ] = " << sendMsg_->head.seq << " [ flag ] = 0x" << hex << sendMsg_->head.flag << " [ len ] = " << dec << len << " [ state ] = " << stateName[state_] << endl;
+    cout << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq << " [ flag ] = 0x" << hex << (int)sendMsg_->head.flag << " [ len ] = " << dec << len << " [ state ] = " << stateName[state_] << endl;
     switch(state_)
     {
         case LISTEN:

@@ -24,12 +24,12 @@ bool SendFile::init()
         cout << "初始化网络错误" << endl;
         return 0;
     }
-    if((sockSend_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+    if((sock_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
     {
         cout << "初始化套接字错误" << endl;
         return 0;
     }
-    if(bind(sockSend_, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == SOCKET_ERROR)
+    if(bind(sock_, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == SOCKET_ERROR)
     {
         cout << "绑定端口错误" << endl;
 
@@ -48,117 +48,114 @@ void SendFile::set_wait_time(int t)
     tv_ = {t / 1000, t % 1000 * 1000};
 }
 
-bool SendFile::init_connect()
+RC SendFile::init_connect()
 {
-    sendMsg_->head.flag = SYN;
-    if(!send_and_wait(0))
-    {
-        cout << "第一次握手失败" << endl;
-        return 0;
-    }
-    if(recvMsg_->head.flag != (SYN | ACK))
-    {
-        cout << "第二次握手失败" << endl;
-        return 0;
-    }
-    sendMsg_->head.flag = ACK;
-    if(!send_message(0))
-    {
-        cout << "第三次握手失败" << endl;
-        return 0;
-    }
-    cout << "建立连接成功" << endl;
-    return 1;
-}
-
-bool SendFile::send_message(int len)
-{
-    if(len < 0) return 1;
-    cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
-    sendMsg_->head.seq = get_seq();
-    sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
-    if(sendto(sockSend_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
-        return 0;
-    return 1;
-}
-
-bool SendFile::resend_message(int len)
-{
-    if(len < 0) return 1;
-    cout << "[重新发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
-    if(sendto(sockSend_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
-        return 0;
-    return 1;
-}
-
-int SendFile::recv_message()
-{
+    RC rc;
     int len;
+    sendMsg_->head.flag = SYN;
+    rc = sendMsg();
+    LOG_MSG(rc, "第一次握手成功", "第一次握手失败");
+
+    while(state_ != ESTABLISHED)
+    {
+        switch(state_)
+        {
+            case LISTEN:
+                sendMsg_->head.flag = SYN;
+                rc = sendMsg();
+            case SYN_SENT:
+                rc = recv_message(len);
+            if(rc == RC::WAIT_TIME_ERROR)
+            {
+                state_ = LISTEN;
+                break;
+            }
+            else
+                LOG_MSG(rc, "第二次握手成功", "第二次握手失败");
+            rc = sendMsg();
+            LOG_MSG(rc, "第三次握手成功\n建立连接成功", "第一次握手失败");
+            break;
+            default:
+                break;
+        }
+    }
+    // rc = recv_message(len);
+    // while(rc == RC::WAIT_TIME_ERROR)
+    // {
+    //     sendMsg(0, sendMsg_->head.seq);
+    //     rc = recv_message(len);
+    // }
+    // LOG_MSG(rc, "第二次握手成功", "第二次握手失败");
+
+    // rc = sendMsg();
+    // LOG_MSG(rc, "第三次握手成功\n建立连接成功", "第一次握手失败");
+    return RC::SUCCESS;
+}
+
+// bool SendFile::sendMsg(int len)
+// {
+//     if(len < 0) return 1;
+//     cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
+//     sendMsg_->head.seq = getSeq();
+//     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
+//     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
+//         return 0;
+//     return 1;
+// }
+
+// bool SendFile::resend_message(int len)
+// {
+//     if(len < 0) return 1;
+//     cout << "[发送] [seq] = " << sendMsg_->head.seq << " [flag] = 0x" << hex << sendMsg_->head.flag << " [len] = " << dec << len << " " << stateName[state_] << endl;
+//     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
+//         return 0;
+//     return 1;
+// }
+
+RC SendFile::recv_message(int &len)
+{
     fd_set rset;
     FD_ZERO(&rset);
-    FD_SET(sockSend_, &rset);
-    if(select(sockSend_ + 1, &rset, NULL, NULL, &tv_) > 0)
+    FD_SET(sock_, &rset);
+    if(select(sock_ + 1, &rset, NULL, NULL, &tv_) > 0)
     {
-        if((len = recvfrom(sockSend_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_)) == SOCKET_ERROR)
-            return len;
-        else 
-            cout << "[接收] [seq]=" << recvMsg_->head.seq << " [flag]=" << recvMsg_->head.flag << " [len]=" << len - sizeof(info) << endl;
+        RC rc = recvMsg(len);
+        if(rc != RC::SUCCESS)
+            return rc;
     }
     else
     {
-        return WAIT_TIME_ERROR;
+        return RC::WAIT_TIME_ERROR;
     }
-    uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
-    if(check_crc32 != recvMsg_->head.crc32)
-        return CHECK_ERROR;
     if(recvMsg_->head.seq != sendMsg_->head.seq && recvMsg_->head.flag != (FIN | ACK))
-        return SEQ_ERROR;
-    return len;
+        return RC::SEQ_ERROR;
+    return RC::SUCCESS;
 }
 
-int SendFile::recv_overtime()
-{
-    int len;
-    fd_set rset;
-    FD_ZERO(&rset);
-    FD_SET(sockSend_, &rset);
-    if(select(sockSend_ + 1, &rset, NULL, NULL, &tv_) > 0)
-    {
-        len = recv_message();
-        return len;
-    }
-    return WAIT_TIME_ERROR;
-}
-
-bool SendFile::send_file_name(const char* fileName)
+RC SendFile::send_file_name(const char* fileName)
 {
     sendMsg_->head.flag = PSH;
     string path = fileName;
     size_t found = path.find_last_of("/\\");
     string file_name = path.substr(found + 1);
     strcpy(sendMsg_->msg, file_name.c_str());
-    if(!send_and_wait(strlen(sendMsg_->msg)))
-    {
-        cout << "发送文件名错误" << endl;
-        return 0;
-    }
-    return 1;
+    RC rc = send_and_wait(strlen(sendMsg_->msg));
+    LOG_MSG(rc, "", "发送文件名错误")
+    return rc;
 }
 
-int SendFile::get_seq()
+int SendFile::getSeq()
 {
     return seq_++ % 2;
 }
 
-bool SendFile::send_and_wait(int len)
+RC SendFile::send_and_wait(int len)
 {
     timeval start, center, end;
     gettimeofday(&start, NULL);
-    if(!send_message(len))
-    {
-        cout << "与接收端失去连接" << endl;
-        return 0;
-    }
+    RC rc;
+    rc = sendMsg(len);
+    LOG_MSG(rc, "", "与接收端失去连接");
     gettimeofday(&center, NULL);
     int recv_len, retry_times = 0;
     while (true)
@@ -166,26 +163,27 @@ bool SendFile::send_and_wait(int len)
         if(retry_times >= MAX_RETRY_TIMES)
         {
             cout << "重传次数过多" << endl;
-            return 0;
+            return RC::INTERNAL;
         }
-
-        if((recv_len = recv_message()) == SOCKET_ERROR)
+        RC rc;
+        rc = recv_message(recv_len);
+        if(rc == RC::SOCK_ERROR)
         {
             cout << "接受数据错误" << endl;
-            return 0;
+            return rc;
         }
-        else if(recv_len == SEQ_ERROR)
+        else if(rc == RC::SEQ_ERROR)
         {
             // cout << "丢弃ACK" << endl;
             continue;
         }
-        else if(recv_len == CHECK_ERROR)
+        else if(rc == RC::CHECK_ERROR)
         {
             // cout << "校验错误重传"  << endl;
-            resend_message(len);
+            sendMsg(len, sendMsg_->head.seq);
             continue;
         }
-        else if(recv_len == WAIT_TIME_ERROR)
+        else if(rc == RC::WAIT_TIME_ERROR)
         {
             // cout << "等待时间过长重传"  << endl;
             // cout << tv_.tv_sec << endl;
@@ -200,9 +198,11 @@ bool SendFile::send_and_wait(int len)
                 tv_.tv_sec = 1;
                 tv_.tv_usec = 0;
             }
-            resend_message(len);
+            sendMsg(len, sendMsg_->head.seq);
             continue;
         }
+        else if(rc == RC::RESET)
+            return rc;
         break;
     }
     gettimeofday(&end, NULL);
@@ -230,77 +230,147 @@ bool SendFile::send_and_wait(int len)
         if(end.tv_usec-start.tv_usec == 0)
             tv_.tv_usec = 2;
     }
-    return 1;
+    return RC::SUCCESS;
 }
 
-bool SendFile::disconnect()
+RC SendFile::disconnect()
 {
+    RC rc = RC::SUCCESS;
+    int len;
     sendMsg_->head.flag = FIN;
-    if(!send_and_wait(0))
+    rc = sendMsg();
+    LOG_MSG(rc, "第一次挥手成功", "第一次挥手失败");
+    while(state_ != CLOSED)
     {
-        cout << "第一次挥手错误" << endl;
-        return 0;
+        switch(state_)
+        {
+            case FIN_WAIT_1:
+                rc = recv_message(len);
+                if(rc == RC::WAIT_TIME_ERROR)
+                {
+                    state_ = ESTABLISHED;
+                    break;
+                }
+                else
+                    LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
+                break;
+            case FIN_WAIT_2:
+                rc = recv_message(len);
+                if(rc == RC::WAIT_TIME_ERROR)
+                {
+                    state_ = ESTABLISHED;
+                    break;
+                }
+                else
+                    LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
+                rc = sendMsg();
+                LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
+                break;
+            case ESTABLISHED:
+                sendMsg_->head.flag = FIN;
+                rc = sendMsg();
+                break;
+            default:
+                break;
+        }
     }
-    if(recvMsg_->head.flag != ACK)
-    {
-        cout << "接收方第二次挥手错误" << endl;
-        return 0;
-    }
-    if(!send_and_wait(-1))
-    {
-        cout << "第三次挥手错误" << endl;
-        return 0;
-    }
+
+    // rc = recv_message(len);
+    // while (rc == RC::WAIT_TIME_ERROR)
+    // {
+    //     sendMsg(0, sendMsg_->head.seq);
+    //     rc = recv_message(len);
+    // }
+    // LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
+    // if(state_ == CLOSED)
+    // {
+    //     cout << "关闭连接成功" << endl;
+    //     return RC::SUCCESS;
+    // }
     
-    if(recvMsg_->head.flag != (FIN | ACK))
-    {
-        cout << "第三次挥手失败" << endl;
-        return 0;
-    }
-    sendMsg_->head.flag = ACK;
-    if(!send_message(0))
-    {
-        cout << "第四次挥手失败" << endl;
-        return 0;
-    }
-    cout << "关闭连接成功" << endl;
-    return 1;
+    // rc = recv_message(len);
+    // while (rc == RC::WAIT_TIME_ERROR)
+    // {
+    //     sendMsg(0, sendMsg_->head.seq);
+    //     rc = recv_message(len);
+    // }
+    // LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
+
+    // rc = sendMsg();
+    // LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
+    return rc;
 }
 
-bool SendFile::send(const char* fileName)
+RC  SendFile::setFile(const char* fileName)
 {
-    timeval start, end;
-    gettimeofday(&start, NULL);
-    if(!init_connect())
-        return 0;
-    if(!send_file_name(fileName))
-        return 0;
     sendFileStream_.open(fileName, ios::binary);
     sendFileStream_.seekg(0, ios::end);
     int wait_send_len = sendFileStream_.tellg();
     fileSize_ = wait_send_len;
     cout << "发送文件大小为 " << wait_send_len << " B" << endl;
     sendFileStream_.seekg(0, ios::beg);
+    fileName_ = strdup(fileName);
+    return RC::SUCCESS;
+}
+
+RC SendFile::start()
+{
+    this->open();
+    timeval start, end;
+    RC rc;
+    gettimeofday(&start, NULL);
+    int try_connect = 0;
+    while(init_connect() != RC::SUCCESS)
+    {
+        try_connect++;
+        if(try_connect == MAX_RETRY_TIMES)
+        {
+            cout << "尝试连接失败" << endl;
+            return RC::INTERNAL;
+        }
+        cout << "尝试重新连接" << endl;
+    }
+    rc = send_file_name(fileName_);
+    if(rc == RC::RESET)
+        return this->start();
+    else if(rc != RC::SUCCESS)
+        return RC::INTERNAL;
     int ret;
+    int wait_send_len = fileSize_;
     while(wait_send_len > 0)
     {
         int send_len = wait_send_len <= MSS ? wait_send_len : MSS;
         sendMsg_->head.flag = PSH;
         sendFileStream_.read(sendMsg_->msg, send_len);
-        ret = send_and_wait(send_len);
+        rc = send_and_wait(send_len);
         if(recvMsg_->head.flag != ACK)
         {
             cout << "接收方响应连接错误" << endl;
-            return 0;
+            return RC::INTERNAL;
         }
-        if(ret == false) return ret;
+        if(rc == RC::RESET)
+        {
+            return this->start();
+        }
+        else if(rc != RC::SUCCESS)
+            return rc;
         wait_send_len -= send_len;
     }
-    ret = disconnect();
-    if(ret == false) return ret;
+    int try_disconnect = 0;
+    while(disconnect() != RC::SUCCESS)
+    {
+        try_disconnect++;
+        if(try_disconnect == MAX_RETRY_TIMES)
+        {
+            cout << "尝试断开连接失败" << endl;
+            return RC::INTERNAL;
+        }
+        cout << "尝试重新断开连接" << endl;
+    }
     gettimeofday(&end, NULL);
     double totalTime = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0;
+    cout << "发送文件大小为 " << fileSize_ << " B" << endl;
     cout << "传输总用时为 " << totalTime << " s" << endl;
     cout << "平均吞吐率为 " << fileSize_ / totalTime * 8 / (1000 * 1000) << " Mbps" << endl;
-    return 1;
+    return RC::SUCCESS;
 }

@@ -2,40 +2,39 @@
 #include "send_file.h"
 #include "recv_file.h"
 #include "defs.h"
+#include <memory>
+#pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
 char sendIP[20] = {SEND_IP};
 char routerIP[20] = {ROUTER_IP};
 char recvIP[20] = {RECV_IP};
 
-bool sendFile(char* fileName)
+RC sendFile(char* fileName)
 {
-    SendFile* send = new SendFile(sendIP, routerIP, SEND_PORT, ROUTER_PORT);
+    unique_ptr<SendFile> send(new SendFile(sendIP, routerIP, ROUTER_PORT, SEND_PORT));
     bool ret;
+    RC rc;
     ret = send->init();
-    if(ret == false) goto send_falied;
-    ret = send->send(fileName);
-    if(ret == false) goto send_falied;
-    delete send;
-    return true;
-send_falied:
-    delete send;
-    return false;
+    if(ret == false)
+        return RC::INTERNAL;
+    send->setFile(fileName);
+    rc = send->start();
+    LOG_MSG(rc, "发送文件成功", "发送文件失败");
+    return rc;
 }
 
-bool recvFile()
+RC recvFile()
 {
-    RecvFile* recv = new RecvFile(routerIP, recvIP, ROUTER_PORT, RECV_PORT);
+    unique_ptr<RecvFile> recv(new RecvFile(routerIP, recvIP, ROUTER_PORT, RECV_PORT));
     bool ret;
+    RC rc = RC::SUCCESS;
     ret = recv->init();
-    if(ret == false) goto recv_falied;
-    ret = recv->recv();
-    if(ret == false) goto recv_falied;
-    delete recv;
-    return true;
-recv_falied:
-    delete recv;
-    return false;
+    if(ret == false) 
+        return RC::INTERNAL;
+    rc = recv->start();
+    LOG_MSG(rc, "接收文件成功", "接收文件失败");
+    return rc;
 }
 
 int main(int argc, char* argv[])
@@ -54,29 +53,11 @@ int main(int argc, char* argv[])
         char fileName[MSS] = {};
         cout << "请输入文件名：";
         cin.getline(fileName, MSS - 1);
-        bool ret = sendFile(fileName);
-        if(ret == false)
-        {
-            cout << "发送文件失败" << endl;
-        }
-        else
-        {
-            cout << "发送文件成功" << endl;
-        }
+        sendFile(fileName);
     }
     else if(sel == 2)
     {
-        bool ret = recvFile();
-        if(ret == false)
-        {
-            cout << "接收文件失败" << endl;
-        }
-        else
-        {
-            cout << "接收文件成功" << endl;
-        }
+        recvFile();
     }
-    cout << endl << "按任意键退出……" << endl;
-    cin.get();
     return 0;
 }

@@ -4,3 +4,4 @@ recv
 *.exe
 *.ipynb
 *.csv
+build

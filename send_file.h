@@ -16,8 +16,6 @@ private:
     RC init_connect();
     void set_wait_time(int t);
     RC send_file_name(const char* fileName);
-    //bool send_message(int len); // 完成设置seq、计算校验码、发送消息
-    //bool resend_message(int len); // 消息重传
     RC recv_message(int &len); // 完成接收消息、检验校验码、检验seq、停等
     virtual int getSeq() override;
     virtual Type getType() override

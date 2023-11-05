@@ -3,8 +3,15 @@
 #include "crc32.h"
 
 using namespace std;
-FileTrans::FileTrans(/* args */)
+FileTrans::FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
 {
+    recvAddr_.sin_family = AF_INET;
+    recvAddr_.sin_addr.S_un.S_addr = inet_addr(recvAddr);
+    recvAddr_.sin_port = htons(recvPort);
+
+    sendAddr_.sin_family = AF_INET;
+    sendAddr_.sin_addr.s_addr = inet_addr(sendAddr);
+    sendAddr_.sin_port = htons(sendPort);
 }
 
 FileTrans::~FileTrans()

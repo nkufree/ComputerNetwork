@@ -13,7 +13,6 @@ private:
     std::ofstream recvFileStream_;
     RC init_connect();
     RC recv_file_name();
-    //RC send_message(int len); // 完成设置seq、计算校验码、发送消息、消息重传
     RC recv_message(int &len); // 完成接收消息、检验校验码、检验seq、消息重传
     virtual int getSeq() override;
     virtual Type getType() override

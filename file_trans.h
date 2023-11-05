@@ -20,7 +20,8 @@ protected:
         F_RECV,
     } ;
 public:
-    FileTrans(/* args */);
+    FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort);
+    FileTrans(){}
     RC open();
     virtual int getSeq() = 0;
     virtual Type getType() = 0;

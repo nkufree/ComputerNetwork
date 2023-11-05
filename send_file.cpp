@@ -5,15 +5,8 @@
 
 using namespace std;
 
-SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
+SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort)
 {
-    recvAddr_.sin_family = AF_INET;
-    recvAddr_.sin_addr.S_un.S_addr = inet_addr(recvAddr);
-    recvAddr_.sin_port = htons(recvPort);
-
-    sendAddr_.sin_family = AF_INET;
-    sendAddr_.sin_addr.s_addr = inet_addr(sendAddr);
-    sendAddr_.sin_port = htons(sendPort);
 }
 
 bool SendFile::init()
@@ -79,38 +72,8 @@ RC SendFile::init_connect()
                 break;
         }
     }
-    // rc = recv_message(len);
-    // while(rc == RC::WAIT_TIME_ERROR)
-    // {
-    //     sendMsg(0, sendMsg_->head.seq);
-    //     rc = recv_message(len);
-    // }
-    // LOG_MSG(rc, "第二次握手成功", "第二次握手失败");
-
-    // rc = sendMsg();
-    // LOG_MSG(rc, "第三次握手成功\n建立连接成功", "第一次握手失败");
     return RC::SUCCESS;
 }
-
-// bool SendFile::sendMsg(int len)
-// {
-//     if(len < 0) return 1;
-//     cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len << endl;
-//     sendMsg_->head.seq = getSeq();
-//     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
-//     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
-//         return 0;
-//     return 1;
-// }
-
-// bool SendFile::resend_message(int len)
-// {
-//     if(len < 0) return 1;
-//     cout << "[发送] [seq] = " << sendMsg_->head.seq << " [flag] = 0x" << hex << sendMsg_->head.flag << " [len] = " << dec << len << " " << stateName[state_] << endl;
-//     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == -1)
-//         return 0;
-//     return 1;
-// }
 
 RC SendFile::recv_message(int &len)
 {
@@ -274,30 +237,6 @@ RC SendFile::disconnect()
                 break;
         }
     }
-
-    // rc = recv_message(len);
-    // while (rc == RC::WAIT_TIME_ERROR)
-    // {
-    //     sendMsg(0, sendMsg_->head.seq);
-    //     rc = recv_message(len);
-    // }
-    // LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
-    // if(state_ == CLOSED)
-    // {
-    //     cout << "关闭连接成功" << endl;
-    //     return RC::SUCCESS;
-    // }
-    
-    // rc = recv_message(len);
-    // while (rc == RC::WAIT_TIME_ERROR)
-    // {
-    //     sendMsg(0, sendMsg_->head.seq);
-    //     rc = recv_message(len);
-    // }
-    // LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
-
-    // rc = sendMsg();
-    // LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
     return rc;
 }
 

@@ -4,15 +4,8 @@
 #include <io.h>
 using namespace std;
 
-RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
+RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort)
 {
-    recvAddr_.sin_family = AF_INET;
-    recvAddr_.sin_addr.S_un.S_addr = inet_addr(recvAddr);
-    recvAddr_.sin_port = htons(recvPort);
-
-    sendAddr_.sin_family = AF_INET;
-    sendAddr_.sin_addr.s_addr = inet_addr(sendAddr);
-    sendAddr_.sin_port = htons(sendPort);
 }
 
 bool RecvFile::init()
@@ -69,15 +62,6 @@ RC RecvFile::init_connect()
             state_ = LISTEN;
         }
     }
-    // rc = recv_message(len);
-    // LOG_MSG(rc, "第一次握手成功", "第一次握手失败");
-
-    // gettimeofday(&start_, NULL);
-    // rc = sendMsg();
-    // LOG_MSG(rc, "第二次握手成功", "第二次握手失败");
-
-    // rc = recv_message(len);
-    // LOG_MSG(rc, "第三次握手成功", "第三次握手失败");
     return rc;
 }
 
@@ -85,16 +69,6 @@ int RecvFile::getSeq()
 {
     return seq_;
 }
-
-// RC RecvFile::sendMsg(int len)
-// {
-//     cout << "[发送] [seq]=" << sendMsg_->head.seq << " [flag]=" << sendMsg_->head.flag << " [len]=" << len  << endl;
-//     sendMsg_->head.seq = recvMsg_->head.seq;
-//     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
-//     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
-//         return 0;
-//     return 1;
-// }
 
 RC RecvFile::recv_message(int &len)
 {
@@ -202,25 +176,6 @@ RC RecvFile::disconnect()
         }
 
     }
-    
-    // rc = sendMsg();
-    // LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
-
-    // sendMsg_->head.flag = FIN | ACK;
-    // rc = sendMsg();
-    // LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
-
-    // fd_set rset;
-    // FD_ZERO(&rset);
-    // FD_SET(sock_, &rset);
-    // timeval tv = { WAIT_TIME / 1000, WAIT_TIME % 1000 * 1000};
-    // if(select(sock_ + 1, &rset, NULL, NULL, &tv) > 0)
-    // {
-    //     RC rc = recvMsg(len);
-    //     if(rc != RC::SUCCESS)
-    //         return rc;
-    // }
-    // LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
     return RC::SUCCESS;
 }
 

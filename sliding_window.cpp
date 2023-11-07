@@ -15,7 +15,7 @@ SlidingWindow::SlidingWindow(int buffSize, int windowSize)
 
 void SlidingWindow::movePos(slidingPos p, int size)
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     switch(p)
     {
     case S_START:
@@ -42,7 +42,7 @@ void SlidingWindow::movePos(slidingPos p, int size)
 
 void SlidingWindow::setPos(slidingPos p, int pos)
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     switch(p)
     {
     case S_START:
@@ -68,20 +68,20 @@ void SlidingWindow::setPos(slidingPos p, int pos)
 
 uint32_t SlidingWindow::getIndexBySeq(uint32_t seq)
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     return (start_ + seq - start_seq_) % buffSize_;
 }
 
 uint32_t SlidingWindow::getSeqByIndex(uint32_t index)
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     uint32_t dif = index - start_;
     return start_seq_ + dif;
 }
 
 uint32_t SlidingWindow::getNextSeq()
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     uint32_t dif = next_ - start_;
     return start_seq_ + dif;
 }
@@ -100,7 +100,7 @@ void SlidingWindow::setFlag(int index, WORD flag)
 
 void SlidingWindow::setWindow(int size)
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     uint32_t tmp = (start_ + size) % buffSize_;
     uint32_t dif = end_ - tmp;
     if(dif > WINDOW_SIZE)
@@ -109,14 +109,14 @@ void SlidingWindow::setWindow(int size)
 
 int SlidingWindow::getWindow()
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     uint32_t dif = end_ - next_;
     return dif;
 }
 
 void SlidingWindow::printSliding()
 {
-    lock_guard<mutex> lock(mutex_);
+    // lock_guard<mutex> lock(mutex_);
     cout << dec << " satrt : " << start_
     << " next : " << next_
     << " end : " << end_ 

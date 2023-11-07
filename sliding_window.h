@@ -4,24 +4,25 @@
 #include <vector>
 #include "defs.h"
 #include <mutex>
-#define GET_POINT(p) \
-    mutex_.lock(); \
-    uint32_t tmp = p; \
-    mutex_.unlock(); \
-    return tmp;
+#include <atomic>
+// #define GET_POINT(p) \
+//     mutex_.lock(); \
+//     uint32_t tmp = p; \
+//     mutex_.unlock(); \
+//     return tmp;
 
 class SlidingWindow
 {
 private:
     int buffSize_;
     //int windowSize_;
-    volatile uint32_t start_;
-    volatile uint32_t start_seq_;
-    volatile uint32_t next_;
-    volatile uint32_t end_;
-    volatile uint32_t end_seq_;
+    std::atomic<uint32_t> start_;
+    std::atomic<uint32_t> start_seq_;
+    std::atomic<uint32_t> next_;
+    std::atomic<uint32_t> end_;
+    std::atomic<uint32_t> end_seq_;
     uint32_t data_end_;
-    std::mutex mutex_;
+    // std::mutex mutex_;
 
 public:
     std::vector<fileMessage> sw_;
@@ -32,10 +33,10 @@ public:
     int getWindow();
     void setWindow(int size);
     void setStartSeq(int seq){start_seq_ = seq;}
-    uint32_t getStartSeq() {GET_POINT(start_seq_);}
-    uint32_t getStart() {GET_POINT(start_);}
-    uint32_t getNext() {GET_POINT(next_);}
-    uint32_t getEnd() {GET_POINT(end_);}
+    uint32_t getStartSeq() {return start_seq_;}
+    uint32_t getStart() {return start_;}
+    uint32_t getNext() {return next_;}
+    uint32_t getEnd() {return next_;}
     uint32_t getDataEnd(){return data_end_;}
     uint32_t getIndexBySeq(uint32_t seq);
     uint32_t getSeqByIndex(uint32_t index);

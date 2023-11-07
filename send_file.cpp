@@ -108,33 +108,6 @@ RC SendFile::send_file_name(const char* fileName)
     return RC::SUCCESS;
 }
 
-// int SendFile::getSeq(bool inc)
-// {
-//     lock_guard<mutex> lock(seq_mutex_);
-//     if(inc)
-//         return seq_++;
-//     else
-//         return seq_;
-// }
-
-// void SendFile::setSeq(uint32_t seq)
-// {
-//     lock_guard<mutex> lock(seq_mutex_);
-//     seq_ = seq;
-// }
-
-// int SendFile::getAck()
-// {
-//     lock_guard<mutex> lock(ack_mutex_);
-//     return ack_;
-// }
-
-// void SendFile::setAck(uint32_t ack)
-// {
-//     lock_guard<mutex> lock(ack_mutex_);
-//     ack_ = ack;
-// }
-
 int SendFile::getWin()
 {
     return sendWindow_.getWindow();

@@ -29,7 +29,7 @@ RC FileTrans::open()
 
 int FileTrans::getSeq(bool inc)
 {
-    lock_guard<mutex> lock(seq_mutex_);
+    // lock_guard<mutex> lock(seq_mutex_);
     if(inc)
         return seq_++;
     else
@@ -38,19 +38,19 @@ int FileTrans::getSeq(bool inc)
 
 void FileTrans::setSeq(uint32_t seq)
 {
-    lock_guard<mutex> lock(seq_mutex_);
+    // lock_guard<mutex> lock(seq_mutex_);
     seq_ = seq;
 }
 
 int FileTrans::getAck()
 {
-    lock_guard<mutex> lock(ack_mutex_);
+    // lock_guard<mutex> lock(ack_mutex_);
     return ack_;
 }
 
 void FileTrans::setAck(uint32_t ack)
 {
-    lock_guard<mutex> lock(ack_mutex_);
+    // lock_guard<mutex> lock(ack_mutex_);
     ack_ = ack;
 }
 
@@ -58,7 +58,7 @@ RC FileTrans::recvMsg(int &len)
 {
     RC rc = RC::SUCCESS;
     len = recvfrom(sock_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_);
-    // print_mutex_.lock();
+    print_mutex_.lock();
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED |
 		FOREGROUND_GREEN | FOREGROUND_BLUE);
     cout << dec << "[ recv ] [ seq ] = " << (int)recvMsg_->head.seq 
@@ -68,7 +68,7 @@ RC FileTrans::recvMsg(int &len)
     << " [ win ] = " << (int)recvMsg_->head.win 
     << " [ state ] = " << stateName[state_] << endl;
     //<< " [ crc32 ] = " << hex << recvMsg_->head.crc32 << endl;
-    // print_mutex_.unlock();
+    print_mutex_.unlock();
     if(len == SOCKET_ERROR)
         return RC::SOCK_ERROR;
     uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
@@ -140,7 +140,7 @@ RC FileTrans::sendMsg(int len, int seq)
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
         return RC::SOCK_ERROR;
-    // print_mutex_.lock();
+    print_mutex_.lock();
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_GREEN);
     cout << dec << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq 
     << " [ ack ] = " << (int)sendMsg_->head.ack
@@ -149,7 +149,7 @@ RC FileTrans::sendMsg(int len, int seq)
     << " [ win ] = " << (int)sendMsg_->head.win 
     << " [ state ] = " << stateName[state_] << endl;
     //<< " [ crc32 ] = 0x" << hex << sendMsg_->head.crc32 << endl;
-    // print_mutex_.unlock();
+    print_mutex_.unlock();
     switch(state_)
     {
         case LISTEN:

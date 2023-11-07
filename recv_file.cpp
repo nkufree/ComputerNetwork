@@ -67,11 +67,6 @@ RC RecvFile::init_connect()
     return rc;
 }
 
-// int RecvFile::getSeq(bool inc)
-// {
-//     return seq_++;
-// }
-
 int RecvFile::getWin()
 {
     return recvWindow_.getWindow();

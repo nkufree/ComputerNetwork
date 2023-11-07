@@ -4,6 +4,7 @@
 #include "defs.h"
 #include <winsock2.h>
 #include <mutex>
+#include <atomic>
 
 class FileTrans
 {
@@ -15,10 +16,10 @@ protected:
     fileMessage* recvMsg_;
     states state_;
     int addrSize_;
-    int seq_;
-    int ack_;
-    std::mutex seq_mutex_;
-    std::mutex ack_mutex_;
+    std::atomic<int> seq_;
+    std::atomic<int> ack_;
+    // std::mutex seq_mutex_;
+    // std::mutex ack_mutex_;
     std::mutex print_mutex_;
     enum Type
     {

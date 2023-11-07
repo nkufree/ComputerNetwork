@@ -19,8 +19,11 @@
 #define ROUTER_IP "127.0.0.1"
 // #define RECV_IP "10.130.100.172"
 #define RECV_IP "127.0.0.1"
-#define BUFF_SIZE 65535
-#define WINDOW_SIZE 400
+#define BUFF_SIZE 16384
+#define WINDOW_SIZE 10
+#define KEEP_ALIVE_TIME 200 // 零窗口发送报文时间
+#define DELAY_ACK_TIME 100  // 延迟发送ACK时间
+#define WRITE_FILE_TIME 200 // 将数据写入文件的间隔时间
 
 enum class RC   // 错误类型
 {
@@ -61,6 +64,7 @@ struct info
     uint32_t crc32;
     uint32_t seq;
     uint32_t ack;
+    WORD len;
     WORD flag;
     WORD win;
 };
@@ -70,6 +74,9 @@ struct fileMessage
     char msg[MSS];
 };
 #pragma pack()
+
+#define MS_TO_TIMEVAL(ms) {ms / 1000, ms % 1000 * 1000}
+#define TIMEVAL_GAP(a, b) ((a.tv_sec - b.tv_sec) * 1000 + (a.tv_usec - b.tv_usec) / 1000)
 
 #define LOG_MSG(rc, success, falied) \
     if(rc != RC::SUCCESS) \

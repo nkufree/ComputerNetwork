@@ -5,3 +5,5 @@ recv
 *.ipynb
 *.csv
 build
+send
+*.log

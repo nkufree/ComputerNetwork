@@ -1,8 +1,8 @@
-CXXFLAGS = -std=c++17 -O2 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g
+CXXFLAGS = -std=c++17 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g
 CXX = g++
 SRC = $(wildcard *.cpp)
 TEMP = ./build/
-OBJ = $(patsubst %cpp, $(TEMP)%o, $(SRC))
+OBJ = $(patsubst %.cpp, $(TEMP)%.o, $(SRC))
 TARGET = main
 
 .PHONY: all create_dir clean

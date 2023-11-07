@@ -1,6 +1,7 @@
 #include "file_trans.h"
 #include <iostream>
 #include "crc32.h"
+#include <windows.h>
 
 using namespace std;
 FileTrans::FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
@@ -12,14 +13,12 @@ FileTrans::FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, i
     sendAddr_.sin_family = AF_INET;
     sendAddr_.sin_addr.s_addr = inet_addr(sendAddr);
     sendAddr_.sin_port = htons(sendPort);
+    seq_ = 0;
+    ack_ = 0;
 }
 
 FileTrans::~FileTrans()
 {
-    if(sendMsg_ != nullptr)
-        delete sendMsg_;
-    if(recvMsg_ != nullptr)
-        delete recvMsg_;
 }
 
 RC FileTrans::open()
@@ -28,16 +27,53 @@ RC FileTrans::open()
     return RC::SUCCESS;
 }
 
+int FileTrans::getSeq(bool inc)
+{
+    lock_guard<mutex> lock(seq_mutex_);
+    if(inc)
+        return seq_++;
+    else
+        return seq_;
+}
+
+void FileTrans::setSeq(uint32_t seq)
+{
+    lock_guard<mutex> lock(seq_mutex_);
+    seq_ = seq;
+}
+
+int FileTrans::getAck()
+{
+    lock_guard<mutex> lock(ack_mutex_);
+    return ack_;
+}
+
+void FileTrans::setAck(uint32_t ack)
+{
+    lock_guard<mutex> lock(ack_mutex_);
+    ack_ = ack;
+}
+
 RC FileTrans::recvMsg(int &len)
 {
     RC rc = RC::SUCCESS;
     len = recvfrom(sock_, (char*)recvMsg_, sizeof(fileMessage), 0, (sockaddr*)&recvAddr_, &addrSize_);
-    cout << "[ recv ] [ seq ] = " << (int)recvMsg_->head.seq << " [ flag ] = 0x" << hex << (int)recvMsg_->head.flag << " [ len ] = " << dec << len - sizeof(info)  << " [ state ] = " << stateName[state_] << endl;
+    // print_mutex_.lock();
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED |
+		FOREGROUND_GREEN | FOREGROUND_BLUE);
+    cout << dec << "[ recv ] [ seq ] = " << (int)recvMsg_->head.seq 
+    << " [ ack ] = " << (int)recvMsg_->head.ack
+    << " [ flag ] = 0x" << hex << (int)recvMsg_->head.flag 
+    << " [ len ] = " << dec << len - sizeof(info)  
+    << " [ win ] = " << (int)recvMsg_->head.win 
+    << " [ state ] = " << stateName[state_] << endl;
+    //<< " [ crc32 ] = " << hex << recvMsg_->head.crc32 << endl;
+    // print_mutex_.unlock();
     if(len == SOCKET_ERROR)
         return RC::SOCK_ERROR;
     uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
-    if(check_crc32 != recvMsg_->head.crc32)
-        return RC::CHECK_ERROR;
+    // if(check_crc32 != recvMsg_->head.crc32)
+    //     return RC::CHECK_ERROR;
     auto& flag = recvMsg_->head.flag;
     switch(state_)
     {
@@ -62,7 +98,7 @@ RC FileTrans::recvMsg(int &len)
         case ESTABLISHED:   // 数据传输状态
             if(flag == FIN)
                 sendMsg_->head.flag = ACK;
-            else if(flag == PSH)
+            else if(flag == PSH && getType() == F_RECV)
                 sendMsg_->head.flag = ACK;
             break;
         case CLOSE_WAIT:    // 接收端发送第二次挥手后，应该发送FIN+ACK而不是接收
@@ -88,7 +124,7 @@ RC FileTrans::recvMsg(int &len)
         default:
             return RC::INTERNAL;
     }
-    
+    setAck(recvMsg_->head.seq + 1);
     return rc;
 }
 
@@ -97,10 +133,23 @@ RC FileTrans::sendMsg(int len, int seq)
     if(len < 0) return RC::INTERNAL;
     if(seq == -1)
         sendMsg_->head.seq = getSeq();
+    else 
+        sendMsg_->head.seq = seq;
+    sendMsg_->head.ack = getAck();
+    sendMsg_->head.win = getWin();
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
         return RC::SOCK_ERROR;
-    cout << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq << " [ flag ] = 0x" << hex << (int)sendMsg_->head.flag << " [ len ] = " << dec << len << " [ state ] = " << stateName[state_] << endl;
+    // print_mutex_.lock();
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_GREEN);
+    cout << dec << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq 
+    << " [ ack ] = " << (int)sendMsg_->head.ack
+    << " [ flag ] = 0x" << hex << (int)sendMsg_->head.flag 
+    << " [ len ] = " << dec << len 
+    << " [ win ] = " << (int)sendMsg_->head.win 
+    << " [ state ] = " << stateName[state_] << endl;
+    //<< " [ crc32 ] = 0x" << hex << sendMsg_->head.crc32 << endl;
+    // print_mutex_.unlock();
     switch(state_)
     {
         case LISTEN:

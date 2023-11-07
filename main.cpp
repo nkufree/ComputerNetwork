@@ -11,7 +11,7 @@ char routerIP[20] = {ROUTER_IP};
 char recvIP[20] = {RECV_IP};
 
 RC sendFile(char* fileName)
-{
+{   
     unique_ptr<SendFile> send(new SendFile(sendIP, routerIP, ROUTER_PORT, SEND_PORT));
     bool ret;
     RC rc;

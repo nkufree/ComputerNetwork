@@ -2,10 +2,11 @@
 #include <iostream>
 #include <time.h>
 #include <sys/time.h>
+#include <thread>
 
 using namespace std;
 
-SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort)
+SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), sendWindow_(BUFF_SIZE, WINDOW_SIZE)
 {
 }
 
@@ -25,13 +26,13 @@ bool SendFile::init()
     if(bind(sock_, (sockaddr*)&recvAddr_, sizeof(recvAddr_)) == SOCKET_ERROR)
     {
         cout << "绑定端口错误" << endl;
-
         return 0;
     }
     sendMsg_ = new fileMessage;
     recvMsg_ = new fileMessage;
     addrSize_ = sizeof(recvAddr_);
     seq_ = 0;
+    ack_ = 0;
     set_wait_time(WAIT_TIME);
     return 1;
 }
@@ -90,7 +91,7 @@ RC SendFile::recv_message(int &len)
     {
         return RC::WAIT_TIME_ERROR;
     }
-    if(recvMsg_->head.seq != sendMsg_->head.seq && recvMsg_->head.flag != (FIN | ACK))
+    if(recvMsg_->head.ack != (sendMsg_->head.seq + 1))
         return RC::SEQ_ERROR;
     return RC::SUCCESS;
 }
@@ -103,13 +104,40 @@ RC SendFile::send_file_name(const char* fileName)
     string file_name = path.substr(found + 1);
     strcpy(sendMsg_->msg, file_name.c_str());
     RC rc = send_and_wait(strlen(sendMsg_->msg));
-    LOG_MSG(rc, "", "发送文件名错误")
-    return rc;
+    LOG_MSG(rc, "", "发送文件名错误");
+    return RC::SUCCESS;
 }
 
-int SendFile::getSeq()
+// int SendFile::getSeq(bool inc)
+// {
+//     lock_guard<mutex> lock(seq_mutex_);
+//     if(inc)
+//         return seq_++;
+//     else
+//         return seq_;
+// }
+
+// void SendFile::setSeq(uint32_t seq)
+// {
+//     lock_guard<mutex> lock(seq_mutex_);
+//     seq_ = seq;
+// }
+
+// int SendFile::getAck()
+// {
+//     lock_guard<mutex> lock(ack_mutex_);
+//     return ack_;
+// }
+
+// void SendFile::setAck(uint32_t ack)
+// {
+//     lock_guard<mutex> lock(ack_mutex_);
+//     ack_ = ack;
+// }
+
+int SendFile::getWin()
 {
-    return seq_++ % 2;
+    return sendWindow_.getWindow();
 }
 
 RC SendFile::send_and_wait(int len)
@@ -207,34 +235,34 @@ RC SendFile::disconnect()
     {
         switch(state_)
         {
-            case FIN_WAIT_1:
-                rc = recv_message(len);
-                if(rc == RC::WAIT_TIME_ERROR)
-                {
-                    state_ = ESTABLISHED;
-                    break;
-                }
-                else
-                    LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
+        case FIN_WAIT_1:
+            rc = recv_message(len);
+            if(rc == RC::WAIT_TIME_ERROR)
+            {
+                state_ = ESTABLISHED;
                 break;
-            case FIN_WAIT_2:
-                rc = recv_message(len);
-                if(rc == RC::WAIT_TIME_ERROR)
-                {
-                    state_ = ESTABLISHED;
-                    break;
-                }
-                else
-                    LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
-                rc = sendMsg();
-                LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
+            }
+            else
+                LOG_MSG(rc, "第二次挥手成功", "第二次挥手失败");
+            break;
+        case FIN_WAIT_2:
+            rc = recv_message(len);
+            if(rc == RC::WAIT_TIME_ERROR)
+            {
+                state_ = ESTABLISHED;
                 break;
-            case ESTABLISHED:
-                sendMsg_->head.flag = FIN;
-                rc = sendMsg();
-                break;
-            default:
-                break;
+            }
+            else
+                LOG_MSG(rc, "第三次挥手成功", "第三次挥手失败");
+            rc = sendMsg();
+            LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
+            break;
+        case ESTABLISHED:
+            sendMsg_->head.flag = FIN;
+            rc = sendMsg();
+            break;
+        default:
+            break;
         }
     }
     return rc;
@@ -244,12 +272,81 @@ RC  SendFile::setFile(const char* fileName)
 {
     sendFileStream_.open(fileName, ios::binary);
     sendFileStream_.seekg(0, ios::end);
-    int wait_send_len = sendFileStream_.tellg();
-    fileSize_ = wait_send_len;
-    cout << "发送文件大小为 " << wait_send_len << " B" << endl;
+    fileSize_ = sendFileStream_.tellg();
+    cout << "发送文件大小为 " << fileSize_ << " B" << endl;
     sendFileStream_.seekg(0, ios::beg);
     fileName_ = strdup(fileName);
     return RC::SUCCESS;
+}
+
+void SendFile::setSendOver(bool send_over)
+{
+    lock_guard<mutex> lock(over_mutex_);
+    send_over_ = send_over;
+}
+
+bool SendFile::getSendOver()
+{
+    lock_guard<mutex> lock(over_mutex_);
+    return send_over_;
+}
+
+void SendFile::waitACK(SendFile* sf)
+{
+    int len;
+    int ack_last = -1;
+    int repeat_time = 1;
+    SlidingWindow& sw = sf->sendWindow_;
+    while(!sf->getSendOver())
+    {
+        sf->recvMsg(len);
+        if(sf->recvMsg_->head.flag != ACK)
+            continue;
+        sw.setWindow(sf->recvMsg_->head.win);
+        if(sf->recvMsg_->head.ack != ack_last)
+        {
+            ack_last = sf->recvMsg_->head.ack;
+            sw.movePos(S_START, ack_last - sw.getStartSeq());
+        }
+        else
+        {
+            repeat_time++;
+            if(repeat_time == 3)
+            {
+                if(ack_last < sw.getNextSeq())
+                {
+                    sf->mutex_.lock();
+                    sw.setPos(S_NEXT, sw.getIndexBySeq(ack_last));
+                    sf->setSeq(ack_last);
+                    sf->mutex_.unlock();
+                }
+                repeat_time = 1;
+            }
+        }
+        if(ack_last == sw.getSeqByIndex(sw.getDataEnd()))
+            sf->setSendOver(true);
+        // sw.printSliding();
+    }
+}
+
+void SendFile::setSendBuf()
+{
+    int wait_set_len = fileSize_;
+    sendWindow_.setStartSeq(seq_);
+    int index = 0;
+    // ofstream write_txt("b.log");
+    while (wait_set_len > 0)
+    {
+        int set_len = wait_set_len <= MSS ? wait_set_len : MSS;
+        sendWindow_.setFlag(index, PSH);
+        sendFileStream_.read(sendWindow_.sw_[index].msg, set_len);
+        sendWindow_.sw_[index].head.len = set_len;
+        // write_txt << index << "  " << set_len << "  " << *((int*)sendWindow_.sw_[index].msg) << endl;
+        index++;
+        wait_set_len -= set_len;
+    }
+    // write_txt.close();
+    sendWindow_.setDataEnd(index);
 }
 
 RC SendFile::start()
@@ -274,27 +371,35 @@ RC SendFile::start()
         return this->start();
     else if(rc != RC::SUCCESS)
         return RC::INTERNAL;
-    int ret;
-    int wait_send_len = fileSize_;
-    while(wait_send_len > 0)
+    setSendBuf();
+    thread wait_ACK(waitACK, this);
+    while(!getSendOver())
     {
-        int send_len = wait_send_len <= MSS ? wait_send_len : MSS;
-        sendMsg_->head.flag = PSH;
-        sendFileStream_.read(sendMsg_->msg, send_len);
-        rc = send_and_wait(send_len);
-        if(recvMsg_->head.flag != ACK)
+        mutex_.lock();
+        sendMsg_ = &(sendWindow_.sw_[sendWindow_.getNext()]);
+        sendMsg(sendMsg_->head.len);
+        sendWindow_.movePos(S_NEXT, 1);
+        mutex_.unlock();
+        while (sendWindow_.getNext() == sendWindow_.getDataEnd())
         {
-            cout << "接收方响应连接错误" << endl;
-            return RC::INTERNAL;
+            Sleep(WRITE_FILE_TIME);
+            if(getSendOver())
+                break;
         }
-        if(rc == RC::RESET)
+        // 如果没有空间，等待窗口大小更新
+        if(sendWindow_.getWindow() == 0)
         {
-            return this->start();
+            sendMsg_ = new fileMessage;
+            sendMsg_->head.flag = PSH;
+            while (sendWindow_.getWindow() == 0)
+            {
+                Sleep(KEEP_ALIVE_TIME);
+                sendMsg(0, 0);
+            }
+            delete sendMsg_;
         }
-        else if(rc != RC::SUCCESS)
-            return rc;
-        wait_send_len -= send_len;
     }
+    wait_ACK.join();
     int try_disconnect = 0;
     while(disconnect() != RC::SUCCESS)
     {

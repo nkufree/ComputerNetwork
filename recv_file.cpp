@@ -2,9 +2,10 @@
 #include <iostream>
 #include <sys/time.h>
 #include <io.h>
+#include <thread>
 using namespace std;
 
-RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort)
+RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), recvWindow_(BUFF_SIZE, WINDOW_SIZE)
 {
 }
 
@@ -29,7 +30,8 @@ bool RecvFile::init()
     sendMsg_ = new fileMessage;
     recvMsg_ = new fileMessage;
     addrSize_ = sizeof(sendAddr_);
-    seq_ = 1;
+    seq_ = 0;
+    ack_ = 0;
     return 1;
 }
 
@@ -43,19 +45,19 @@ RC RecvFile::init_connect()
         switch(state_)
         {
         case LISTEN:
-            rc = recv_message(len);
+            rc = recvMsg(len);
             LOG_MSG(rc, "第一次握手成功", "第一次握手失败");
             gettimeofday(&start_, NULL);
             rc = sendMsg();
             break;
         case SYN_RCVD:
-            rc = recv_message(len);
+            rc = recvMsg(len);
             LOG_MSG(rc, "第三次握手成功", "第三次握手失败");
             break;
         default:
             break;
         }
-        if(recvMsg_->head.flag == PSH)
+        if(recvMsg_->head.flag == PSH && state_ != ESTABLISHED)
         {
             sendMsg_->head.flag = RST;
             sendMsg();
@@ -65,30 +67,24 @@ RC RecvFile::init_connect()
     return rc;
 }
 
-int RecvFile::getSeq()
+// int RecvFile::getSeq(bool inc)
+// {
+//     return seq_++;
+// }
+
+int RecvFile::getWin()
 {
-    return seq_;
+    return recvWindow_.getWindow();
 }
 
 RC RecvFile::recv_message(int &len)
 {
     RC rc;
-    while(true)
-    {
-        rc = recvMsg(len);
-        if(rc != RC::SUCCESS)
-            return rc;
-        if(recvMsg_->head.seq == seq_)
-        {
-            sendMsg_->head.flag = ACK;
-            rc = sendMsg();
-            if(rc != RC::SUCCESS)
-                return rc;
-            continue;
-        }
-        break;
-    }
-    seq_ = recvMsg_->head.seq;
+    rc = recvMsg(len);
+    if(rc != RC::SUCCESS)
+        return rc;
+    sendMsg_->head.flag = ACK;
+    rc = sendMsg();
     return rc;
 }
 
@@ -100,9 +96,9 @@ RC RecvFile::recv_file_name()
     LOG_MSG(rc, "", "与发送方断开连接");
 
     ((char*)recvMsg_)[len] = '\0';
-    seq_ = recvMsg_->head.seq;
     cout << "收到文件名：" << recvMsg_->msg << endl;
     sendMsg_->head.flag = ACK;
+    sendMsg_->head.ack = recvMsg_->head.seq + 1;
     rc = sendMsg();
     if(access("recv", 0) == -1)
     {
@@ -111,32 +107,91 @@ RC RecvFile::recv_file_name()
     char recvDir[MSS + 8] = {"recv\\"};
     strcat(recvDir, recvMsg_->msg);
     recvFileStream_.open(recvDir, ios::binary);
+    recvWindow_.setStartSeq(recvMsg_->head.seq + 1);
     return rc;
+}
+
+void RecvFile::setRecvOver(bool recv_over)
+{
+    lock_guard<mutex> lock(over_mutex_);
+    recv_over_ = recv_over;
+}
+
+bool RecvFile::getRecvOver()
+{
+    lock_guard<mutex> lock(over_mutex_);
+    return recv_over_;
+}
+
+void RecvFile::writeInDisk(RecvFile* rf)
+{
+    SlidingWindow& sw = rf->recvWindow_;
+    // ofstream write_txt("a.log");
+    int t = 0;
+    while(!(rf->getRecvOver() && sw.getStart() == sw.getEnd()))
+    {
+        Sleep(WRITE_FILE_TIME);
+        while (sw.getStart() != sw.getNext())
+        {
+            fileMessage& msg = sw.sw_[sw.getStart()];
+            // write_txt << t++ << "  " << msg.head.len << "  " << *((int*)msg.msg) << endl;
+            rf->recvFileStream_.write(msg.msg, msg.head.len);
+            sw.movePos(S_START, 1);
+            // sw.movePos(S_END, 1);
+        }
+        rf->recvFileStream_.flush();
+    }
+    // write_txt.close();
 }
 
 RC RecvFile::wait_and_send()
 {
     int len;
     RC rc;
+    timeval start, end;
+    
+    gettimeofday(&start, NULL);
     while(true)
     {
-        rc = recv_message(len);
+        fd_set rset;
+        FD_ZERO(&rset);
+        FD_SET(sock_, &rset);
+        timeval tv = MS_TO_TIMEVAL(WAIT_TIME);
+        if(select(sock_ + 1, &rset, NULL, NULL, &tv) > 0)
+        {
+            rc = recvMsg(len);
+        }
         LOG_MSG(rc, "", "与发送方断开连接");
         if(recvMsg_->head.flag == PSH)
         {
-            seq_ = recvMsg_->head.seq;
-            recvFileStream_.write(recvMsg_->msg, len - sizeof(info));
-            recvFileStream_.flush();
-            sendMsg_->head.flag = ACK;
-            RC rc;
-            rc = sendMsg();
-            LOG_MSG(rc, "", "发送消息失败");
+            uint32_t &seq = recvMsg_->head.seq;
+            // cout << "seq : " << seq << " nextseq : " << recvWindow_.getNextSeq() << endl;
+            if(seq == recvWindow_.getNextSeq())
+            {
+                memcpy(&recvWindow_.sw_[recvWindow_.getNext()], recvMsg_, sizeof(fileMessage));
+                recvWindow_.movePos(S_NEXT, 1);
+                recvWindow_.movePos(S_END, 1);
+            }
+            // recvWindow_.printSliding();
+            gettimeofday(&end, NULL);
+            if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
+            {
+                RC rc;
+                // sendMsg_->head.ack = seq + 1;
+                setAck(recvWindow_.getNextSeq());
+                rc = sendMsg();
+                LOG_MSG(rc, "", "发送消息失败");
+                start = end;
+            }
         }
         else if(recvMsg_->head.flag == FIN)
         {
+            setRecvOver(true);
+            recvWindow_.setPos(S_END, recvWindow_.getNext());
             return disconnect();
         }
     }
+    
     return rc;
 }
 
@@ -144,7 +199,7 @@ RC RecvFile::disconnect()
 {
     int len;
     RC rc;
-    timeval tv = { WAIT_TIME / 1000, WAIT_TIME % 1000 * 1000};
+    timeval tv = MS_TO_TIMEVAL(WAIT_TIME);
     while (state_ != CLOSED)
     {
         switch (state_)
@@ -190,7 +245,10 @@ RC RecvFile::start()
     if(rc != RC::SUCCESS)
         return rc;
     
+    sendMsg_->head.flag = ACK;
+    thread write_in_disk(writeInDisk, this);
     rc = wait_and_send();
+    write_in_disk.join();
     if(rc != RC::SUCCESS)
         return rc;
     gettimeofday(&end_, NULL);

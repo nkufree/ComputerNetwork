@@ -108,13 +108,13 @@ RC RecvFile::recv_file_name()
 
 void RecvFile::setRecvOver(bool recv_over)
 {
-    lock_guard<mutex> lock(over_mutex_);
+    // lock_guard<mutex> lock(over_mutex_);
     recv_over_ = recv_over;
 }
 
 bool RecvFile::getRecvOver()
 {
-    lock_guard<mutex> lock(over_mutex_);
+    // lock_guard<mutex> lock(over_mutex_);
     return recv_over_;
 }
 

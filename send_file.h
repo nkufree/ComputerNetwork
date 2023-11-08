@@ -5,6 +5,7 @@
 #include "file_trans.h"
 #include "sliding_window.h"
 #include <fstream>
+#include <atomic>
 
 class SendFile : public FileTrans
 {
@@ -18,8 +19,8 @@ private:
     timeval tv_;
     // std::mutex seq_mutex_;
     // std::mutex ack_mutex_;
-    volatile bool send_over_ = false;
-    std::mutex over_mutex_;
+    volatile std::atomic_bool send_over_ = false;
+    // std::mutex over_mutex_;
     std::mutex mutex_;
     RC init_connect();
     void set_wait_time(int t);

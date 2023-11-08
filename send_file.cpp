@@ -254,13 +254,13 @@ RC  SendFile::setFile(const char* fileName)
 
 void SendFile::setSendOver(bool send_over)
 {
-    lock_guard<mutex> lock(over_mutex_);
+    // lock_guard<mutex> lock(over_mutex_);
     send_over_ = send_over;
 }
 
 bool SendFile::getSendOver()
 {
-    lock_guard<mutex> lock(over_mutex_);
+    // lock_guard<mutex> lock(over_mutex_);
     return send_over_;
 }
 

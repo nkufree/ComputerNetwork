@@ -13,8 +13,8 @@ private:
     timeval start_, end_;
     std::ofstream recvFileStream_;
     SlidingWindow recvWindow_;
-    bool recv_over_;
-    std::mutex over_mutex_;
+    volatile std::atomic_bool recv_over_;
+    // std::mutex over_mutex_;
     RC init_connect();
     RC recv_file_name();
     RC recv_message(int &len); // 完成接收消息、检验校验码、检验seq、消息重传

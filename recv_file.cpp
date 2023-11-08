@@ -219,6 +219,7 @@ RC RecvFile::disconnect()
                 if(rc != RC::SUCCESS)
                     return rc;
             }
+            state_ = CLOSED;
             LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
             break;
         default:

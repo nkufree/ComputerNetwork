@@ -6,3 +6,4 @@ recv
 *.csv
 *.log
 send
+build

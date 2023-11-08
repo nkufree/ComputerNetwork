@@ -291,6 +291,7 @@ void SendFile::waitACK(SendFile* sf)
                     sf->mutex_.lock();
                     sw.setPos(S_NEXT, sw.getIndexBySeq(ack_last));
                     sf->setSeq(ack_last);
+                    sw.addLossAck(ack_last);
                     sf->mutex_.unlock();
                 }
                 repeat_time = 1;
@@ -349,11 +350,13 @@ RC SendFile::start()
     while(!getSendOver())
     {
         mutex_.lock();
-        sendMsg_ = &(sendWindow_.sw_[sendWindow_.getNext()]);
+        volatile int send_index = sendWindow_.getNextSend();
+        sendMsg_ = &(sendWindow_.sw_[send_index]);
+        setSeq(sendWindow_.getSeqByIndex(send_index));
         sendMsg(sendMsg_->head.len);
-        sendWindow_.movePos(S_NEXT, 1);
+        sendWindow_.updateNext(send_index);
         mutex_.unlock();
-        while (sendWindow_.getNext() == sendWindow_.getDataEnd())
+        while (sendWindow_.getNextSend() == sendWindow_.getDataEnd())
         {
             Sleep(WRITE_FILE_TIME);
             if(getSendOver())

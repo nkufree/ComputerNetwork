@@ -167,13 +167,22 @@ RC RecvFile::wait_and_send()
                 recvWindow_.movePos(S_NEXT, 1);
                 recvWindow_.movePos(S_END, 1);
             }
+            else if(seq == recvWindow_.getNextAck())
+            {
+                memcpy(&recvWindow_.sw_[recvWindow_.getNextAck()], recvMsg_, sizeof(fileMessage));
+                recvWindow_.updateNext();
+            }
+            else
+            {
+                recvWindow_.addLossAck(seq);
+            }
             // recvWindow_.printSliding();
             gettimeofday(&end, NULL);
             if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
             {
                 RC rc;
                 // sendMsg_->head.ack = seq + 1;
-                setAck(recvWindow_.getNextSeq());
+                setAck(recvWindow_.getNextAck());
                 rc = sendMsg();
                 LOG_MSG(rc, "", "发送消息失败");
                 start = end;
@@ -219,6 +228,7 @@ RC RecvFile::disconnect()
                 if(rc != RC::SUCCESS)
                     return rc;
             }
+            state_ = CLOSED;
             LOG_MSG(rc, "第四次挥手成功\n关闭连接成功", "第四次挥手失败");
             break;
         default:

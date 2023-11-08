@@ -11,6 +11,7 @@ SlidingWindow::SlidingWindow(int buffSize, int windowSize)
     start_seq_ = 0;
     end_seq_ = 0;
     next_ = 0;
+    loss_ack_ = new queue<uint32_t>();
 }
 
 void SlidingWindow::movePos(slidingPos p, int size)
@@ -79,11 +80,50 @@ uint32_t SlidingWindow::getSeqByIndex(uint32_t index)
     return start_seq_ + dif;
 }
 
+uint32_t SlidingWindow::getNext()
+{
+    return next_;
+}
+
 uint32_t SlidingWindow::getNextSeq()
 {
     // lock_guard<mutex> lock(mutex_);
     uint32_t dif = next_ - start_;
     return start_seq_ + dif;
+}
+
+uint32_t SlidingWindow::getNextAck()
+{
+    if(loss_ack_.load()->empty())
+        return next_ + start_seq_;
+    else
+        return loss_ack_.load()->front() + start_seq_;
+}
+
+uint32_t SlidingWindow::getNextSend()
+{
+    if(loss_ack_.load()->empty())
+        return next_;
+    else
+        return loss_ack_.load()->front();
+}
+
+void SlidingWindow::updateNext(uint32_t index)
+{
+    if(index == next_)
+        movePos(S_NEXT, 1);
+    else if(index == loss_ack_.load()->front())
+        loss_ack_.load()->pop();
+}
+
+void SlidingWindow::updateNext()
+{
+    loss_ack_.load()->pop();
+}
+
+void SlidingWindow::addLossAck(uint32_t ack)
+{
+    loss_ack_.load()->push(ack);
 }
 
 void SlidingWindow::setData(int index, char* msg, int len)

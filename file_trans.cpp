@@ -71,9 +71,9 @@ RC FileTrans::recvMsg(int &len)
     print_mutex_.unlock();
     if(len == SOCKET_ERROR)
         return RC::SOCK_ERROR;
-    uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.flag),len  - sizeof(info::crc32));
-    // if(check_crc32 != recvMsg_->head.crc32)
-    //     return RC::CHECK_ERROR;
+    uint32_t check_crc32 = crc32((unsigned char*)&(recvMsg_->head.seq),len  - sizeof(info::crc32));
+    if(check_crc32 != recvMsg_->head.crc32)
+        return RC::CHECK_ERROR;
     auto& flag = recvMsg_->head.flag;
     switch(state_)
     {
@@ -137,7 +137,7 @@ RC FileTrans::sendMsg(int len, int seq)
         sendMsg_->head.seq = seq;
     sendMsg_->head.ack = getAck();
     sendMsg_->head.win = getWin();
-    sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
+    sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.seq),len + sizeof(info) - sizeof(info::crc32));
     if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
         return RC::SOCK_ERROR;
     print_mutex_.lock();

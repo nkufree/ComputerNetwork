@@ -4,3 +4,5 @@ recv
 *.exe
 *.ipynb
 *.csv
+*.log
+send

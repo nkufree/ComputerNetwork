@@ -275,11 +275,13 @@ void SendFile::waitACK(SendFile* sf)
         sf->recvMsg(len);
         if(sf->recvMsg_->head.flag != ACK)
             continue;
-        sw.setWindow(sf->recvMsg_->head.win);
         if(sf->recvMsg_->head.ack != ack_last)
         {
             ack_last = sf->recvMsg_->head.ack;
-            sw.movePos(S_START, ack_last - sw.getStartSeq());
+            // sw.updateNext();
+            sw.movePos(S_NEXT, 1);
+            sw.updateStart();
+            sw.setWindow(sf->recvMsg_->head.win);
         }
         else
         {
@@ -289,9 +291,10 @@ void SendFile::waitACK(SendFile* sf)
                 if(ack_last < sw.getNextSeq())
                 {
                     sf->mutex_.lock();
-                    sw.setPos(S_NEXT, sw.getIndexBySeq(ack_last));
+                    sw.setPos(S_START, sw.getIndexBySeq(ack_last));
+                    sw.setWindow(sf->recvMsg_->head.win);
                     sf->setSeq(ack_last);
-                    sw.addLossAck(ack_last);
+                    sw.addLossAck(sw.getIndexBySeq(ack_last));
                     sf->mutex_.unlock();
                 }
                 repeat_time = 1;

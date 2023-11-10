@@ -161,21 +161,25 @@ RC RecvFile::wait_and_send()
         {
             uint32_t &seq = recvMsg_->head.seq;
             // cout << "seq : " << seq << " nextseq : " << recvWindow_.getNextSeq() << endl;
-            if(seq == recvWindow_.getNextSeq())
-            {
-                memcpy(&recvWindow_.sw_[recvWindow_.getNext()], recvMsg_, sizeof(fileMessage));
-                recvWindow_.movePos(S_NEXT, 1);
-                recvWindow_.movePos(S_END, 1);
-            }
-            else if(seq == recvWindow_.getNextAck())
-            {
-                memcpy(&recvWindow_.sw_[recvWindow_.getNextAck()], recvMsg_, sizeof(fileMessage));
-                recvWindow_.updateNext();
-            }
-            else
-            {
-                recvWindow_.addLossAck(seq);
-            }
+            // if(seq == recvWindow_.getNextSeq())
+            // {
+            //     memcpy(&recvWindow_.sw_[recvWindow_.getNext()], recvMsg_, sizeof(fileMessage));
+            //     recvWindow_.movePos(S_NEXT, 1);
+            //     recvWindow_.movePos(S_END, 1);
+            // }
+            // else if(seq == recvWindow_.getNextAck())
+            // {
+            //     memcpy(&recvWindow_.sw_[recvWindow_.getNextAck()], recvMsg_, sizeof(fileMessage));
+            //     // recvWindow_.updateNext();
+            // }
+            // else if(seq > recvWindow_.getNextSeq())
+            // {
+            //     cout << "loss : " << recvWindow_.getNextAck() << endl;
+            //     if(seq >)
+                
+            //     recvWindow_.movePos(S_NEXT, 1);
+            // }
+            recvWindow_.updateMsg(recvMsg_);
             // recvWindow_.printSliding();
             gettimeofday(&end, NULL);
             if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)

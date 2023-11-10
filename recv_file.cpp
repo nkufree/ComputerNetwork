@@ -83,6 +83,8 @@ RC RecvFile::recv_message(int &len)
     while(true)
     {
         rc = recvMsg(len);
+        if(rc == RC::CHECK_ERROR)
+            continue;
         if(rc != RC::SUCCESS)
             return rc;
         if(recvMsg_->head.seq == seq_)

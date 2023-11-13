@@ -21,6 +21,10 @@ protected:
     // std::mutex seq_mutex_;
     // std::mutex ack_mutex_;
     std::mutex print_mutex_;
+    int loss_num_;
+    int loss_count_;
+    int delay_;
+    int delay_count_;
     enum Type
     {
         F_SEND,

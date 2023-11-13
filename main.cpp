@@ -12,9 +12,17 @@ char recvIP[20] = {RECV_IP};
 
 RC sendFile(char* fileName)
 {   
-    unique_ptr<SendFile> send(new SendFile(sendIP, routerIP, ROUTER_PORT, SEND_PORT));
+    unique_ptr<SendFile> send(new SendFile(sendIP, routerIP, RECV_PORT, SEND_PORT));
+    double loss;
+    int delay;
+    cout << "请输入丢包率(%):";
+    cin >> loss;
+    cout << "请输入延迟(ms):";
+    cin >> delay;
     bool ret;
     RC rc;
+    send->setLoss(loss);
+    send->setDelay(delay);
     ret = send->init();
     if(ret == false)
         return RC::INTERNAL;
@@ -26,7 +34,7 @@ RC sendFile(char* fileName)
 
 RC recvFile()
 {
-    unique_ptr<RecvFile> recv(new RecvFile(routerIP, recvIP, ROUTER_PORT, RECV_PORT));
+    unique_ptr<RecvFile> recv(new RecvFile(routerIP, recvIP, SEND_PORT, RECV_PORT));
     bool ret;
     RC rc = RC::SUCCESS;
     ret = recv->init();

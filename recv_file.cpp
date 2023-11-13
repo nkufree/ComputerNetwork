@@ -5,7 +5,7 @@
 #include <thread>
 using namespace std;
 
-RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), recvWindow_(BUFF_SIZE, WINDOW_SIZE)
+RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), recvWindow_(BUFF_SIZE, RECV_WINDOW_SIZE)
 {
 }
 
@@ -69,7 +69,7 @@ RC RecvFile::init_connect()
 
 int RecvFile::getWin()
 {
-    return recvWindow_.getWindow();
+    return RECV_WINDOW_SIZE;
 }
 
 RC RecvFile::recv_message(int &len)
@@ -126,7 +126,7 @@ void RecvFile::writeInDisk(RecvFile* rf)
     while(!(rf->getRecvOver() && sw.getStart() == sw.getEnd()))
     {
         Sleep(WRITE_FILE_TIME);
-        while (sw.getStart() != sw.getNext())
+        while (sw.getStart() != sw.getNextSend())
         {
             fileMessage& msg = sw.sw_[sw.getStart()];
             // write_txt << t++ << "  " << msg.head.len << "  " << *((int*)msg.msg) << endl;
@@ -160,29 +160,11 @@ RC RecvFile::wait_and_send()
         if(recvMsg_->head.flag == PSH)
         {
             uint32_t &seq = recvMsg_->head.seq;
-            // cout << "seq : " << seq << " nextseq : " << recvWindow_.getNextSeq() << endl;
-            // if(seq == recvWindow_.getNextSeq())
-            // {
-            //     memcpy(&recvWindow_.sw_[recvWindow_.getNext()], recvMsg_, sizeof(fileMessage));
-            //     recvWindow_.movePos(S_NEXT, 1);
-            //     recvWindow_.movePos(S_END, 1);
-            // }
-            // else if(seq == recvWindow_.getNextAck())
-            // {
-            //     memcpy(&recvWindow_.sw_[recvWindow_.getNextAck()], recvMsg_, sizeof(fileMessage));
-            //     // recvWindow_.updateNext();
-            // }
-            // else if(seq > recvWindow_.getNextSeq())
-            // {
-            //     cout << "loss : " << recvWindow_.getNextAck() << endl;
-            //     if(seq >)
-                
-            //     recvWindow_.movePos(S_NEXT, 1);
-            // }
             recvWindow_.updateMsg(recvMsg_);
+            // recvWindow_.printAckQuene();
             // recvWindow_.printSliding();
             gettimeofday(&end, NULL);
-            if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
+            // if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
             {
                 RC rc;
                 // sendMsg_->head.ack = seq + 1;
@@ -254,6 +236,7 @@ RC RecvFile::start()
     if(rc != RC::SUCCESS)
         return rc;
     
+    recv_over_ = false;
     sendMsg_->head.flag = ACK;
     thread write_in_disk(writeInDisk, this);
     rc = wait_and_send();

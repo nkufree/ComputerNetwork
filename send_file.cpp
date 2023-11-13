@@ -6,7 +6,7 @@
 
 using namespace std;
 
-SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), sendWindow_(BUFF_SIZE, WINDOW_SIZE)
+SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), sendWindow_(BUFF_SIZE, SEND_WINDOW_SIZE)
 {
 }
 
@@ -110,7 +110,7 @@ RC SendFile::send_file_name(const char* fileName)
 
 int SendFile::getWin()
 {
-    return sendWindow_.getWindow();
+    return sendWindow_.getSendWindow();
 }
 
 RC SendFile::send_and_wait(int len)
@@ -270,18 +270,26 @@ void SendFile::waitACK(SendFile* sf)
     int ack_last = -1;
     int repeat_time = 1;
     SlidingWindow& sw = sf->sendWindow_;
+    int endSeq = sw.getSeqByIndex(sw.getDataEnd());
     while(!sf->getSendOver())
     {
         sf->recvMsg(len);
-        if(sf->recvMsg_->head.flag != ACK)
+        if((sf->recvMsg_->head.flag & ACK) == 0)
             continue;
-        if(sf->recvMsg_->head.ack != ack_last)
+        // if(sw.getNext() == sw.getDataEnd() && sf->recvMsg_->head.ack != endSeq)
+        // {
+        //     sf->mutex_.lock();
+        //     sw.setWindow(SEND_WINDOW_SIZE);
+        //     sw.addLossAck(sw.getIndexBySeq(sf->recvMsg_->head.ack));
+        //     sf->mutex_.unlock();
+        // }
+        else if(sf->recvMsg_->head.ack != ack_last)
         {
             ack_last = sf->recvMsg_->head.ack;
             // sw.updateNext();
-            sw.movePos(S_NEXT, 1);
+            // sw.movePos(S_NEXT, 1);
             sw.updateStart();
-            sw.setWindow(sf->recvMsg_->head.win);
+            sw.setWindow(SEND_WINDOW_SIZE);
         }
         else
         {
@@ -291,9 +299,7 @@ void SendFile::waitACK(SendFile* sf)
                 if(ack_last < sw.getNextSeq())
                 {
                     sf->mutex_.lock();
-                    sw.setPos(S_START, sw.getIndexBySeq(ack_last));
-                    sw.setWindow(sf->recvMsg_->head.win);
-                    sf->setSeq(ack_last);
+                    sw.setWindow(SEND_WINDOW_SIZE);
                     sw.addLossAck(sw.getIndexBySeq(ack_last));
                     sf->mutex_.unlock();
                 }
@@ -352,13 +358,18 @@ RC SendFile::start()
     thread wait_ACK(waitACK, this);
     while(!getSendOver())
     {
+        Sleep(1);
         mutex_.lock();
         volatile int send_index = sendWindow_.getNextSend();
         sendMsg_ = &(sendWindow_.sw_[send_index]);
         setSeq(sendWindow_.getSeqByIndex(send_index));
         sendMsg(sendMsg_->head.len);
         sendWindow_.updateNext(send_index);
+        // sendWindow_.printSliding();
         mutex_.unlock();
+        // print_mutex_.lock();
+        // sendWindow_.printAckQuene();
+        // print_mutex_.unlock();
         while (sendWindow_.getNextSend() == sendWindow_.getDataEnd())
         {
             Sleep(WRITE_FILE_TIME);
@@ -366,11 +377,11 @@ RC SendFile::start()
                 break;
         }
         // 如果没有空间，等待窗口大小更新
-        if(sendWindow_.getWindow() == 0)
+        if(sendWindow_.getSendWindow() == 0)
         {
             sendMsg_ = new fileMessage;
             sendMsg_->head.flag = PSH;
-            while (sendWindow_.getWindow() == 0)
+            while (sendWindow_.getSendWindow() == 0)
             {
                 Sleep(KEEP_ALIVE_TIME);
                 sendMsg(0, 0);

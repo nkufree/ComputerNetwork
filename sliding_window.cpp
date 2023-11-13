@@ -71,14 +71,13 @@ void SlidingWindow::setPos(slidingPos p, int pos)
 uint32_t SlidingWindow::getIndexBySeq(uint32_t seq)
 {
     // lock_guard<mutex> lock(mutex_);
-    return (start_ + seq - start_seq_) % buffSize_;
+    return (seq - seq_index_gap_) % buffSize_;
 }
 
 uint32_t SlidingWindow::getSeqByIndex(uint32_t index)
 {
     // lock_guard<mutex> lock(mutex_);
-    uint32_t dif = index - start_;
-    return start_seq_ + dif;
+    return index + seq_index_gap_;
 }
 
 uint32_t SlidingWindow::getNext()
@@ -89,16 +88,15 @@ uint32_t SlidingWindow::getNext()
 uint32_t SlidingWindow::getNextSeq()
 {
     // lock_guard<mutex> lock(mutex_);
-    uint32_t dif = next_ - start_;
-    return start_seq_ + dif;
+    return next_ + seq_index_gap_;
 }
 
 uint32_t SlidingWindow::getNextAck()
 {
     if(loss_ack_.load()->empty())
-        return next_ + start_seq_;
+        return getSeqByIndex(next_);
     else
-        return *(loss_ack_.load()->begin()) + start_seq_;
+        return getSeqByIndex(*(loss_ack_.load()->begin()));
 }
 
 uint32_t SlidingWindow::getNextSend()
@@ -128,7 +126,7 @@ void SlidingWindow::updateMsg(fileMessage* msg)
         next_ += 1;
         end_ += 1;
     }
-    else if(loss_ack_.load()->find(seq) != loss_ack_.load()->end())
+    else if(loss_ack_.load()->find(getIndexBySeq(seq)) != loss_ack_.load()->end())
     {
         uint32_t index = getIndexBySeq(seq);
         memcpy(&sw_[index], msg, sizeof(fileMessage));
@@ -144,7 +142,7 @@ void SlidingWindow::updateMsg(fileMessage* msg)
         }
         cout << endl;
         next_ = getIndexBySeq(seq);
-        end_ = next_ + WINDOW_SIZE;
+        end_ = next_ + SEND_WINDOW_SIZE;
         memcpy(&sw_[next_], msg, sizeof(fileMessage));
         next_ += 1;
         end_ += 1;
@@ -186,8 +184,15 @@ void SlidingWindow::setWindow(int size)
     // lock_guard<mutex> lock(mutex_);
     uint32_t tmp = (start_ + size) % buffSize_;
     uint32_t dif = end_ - tmp;
-    if(dif > WINDOW_SIZE)
+    if(dif > SEND_WINDOW_SIZE)
         end_ = tmp;
+}
+
+int SlidingWindow::getSendWindow()
+{
+    // lock_guard<mutex> lock(mutex_);
+    uint32_t dif = end_ - getNextSend();
+    return dif;
 }
 
 int SlidingWindow::getWindow()
@@ -208,8 +213,12 @@ void SlidingWindow::printSliding()
 
 void SlidingWindow::printAckQuene()
 {
-    // cout << dec << "ack quene first : " << loss_ack_.load()->front()
-    // << " next : " << next_ << endl;
+    cout << "ack loss : ";
+    for(auto i : *loss_ack_.load())
+    {
+        cout << getSeqByIndex(i) << " ";
+    }
+    cout << "next : " << getSeqByIndex(next_) << endl;
 }
 
 SlidingWindow::~SlidingWindow()

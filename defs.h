@@ -20,9 +20,10 @@
 // #define RECV_IP "10.130.100.172"
 #define RECV_IP "127.0.0.1"
 #define BUFF_SIZE 16384
-#define WINDOW_SIZE 10
-#define KEEP_ALIVE_TIME 200 // 零窗口发送报文时间
-#define DELAY_ACK_TIME 100  // 延迟发送ACK时间
+#define SEND_WINDOW_SIZE 20
+#define RECV_WINDOW_SIZE 1
+#define KEEP_ALIVE_TIME 100 // 零窗口发送报文时间
+#define DELAY_ACK_TIME 50  // 延迟发送ACK时间
 #define WRITE_FILE_TIME 200 // 将数据写入文件的间隔时间
 
 enum class RC   // 错误类型

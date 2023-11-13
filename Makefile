@@ -1,4 +1,4 @@
-CXXFLAGS = -std=c++17 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g -pthread
+CXXFLAGS = -std=c++17 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g -pthread -static
 CXX = g++
 SRC = $(wildcard *.cpp)
 TEMP = ./build/

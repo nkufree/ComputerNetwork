@@ -15,6 +15,10 @@ FileTrans::FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, i
     sendAddr_.sin_port = htons(sendPort);
     seq_ = 0;
     ack_ = 0;
+    loss_count_ = 0;
+    delay_count_ = 0;
+    loss_num_ = 0xFFFFFFF;
+    delay_ = 0;
 }
 
 FileTrans::~FileTrans()
@@ -130,6 +134,8 @@ RC FileTrans::recvMsg(int &len)
 
 RC FileTrans::sendMsg(int len, int seq)
 {
+    loss_count_++;
+    delay_count_++;
     if(len < 0) return RC::INTERNAL;
     if(seq == -1)
         sendMsg_->head.seq = getSeq();
@@ -138,8 +144,13 @@ RC FileTrans::sendMsg(int len, int seq)
     sendMsg_->head.ack = getAck();
     sendMsg_->head.win = getWin();
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.seq),len + sizeof(info) - sizeof(info::crc32));
-    if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
-        return RC::SOCK_ERROR;
+    if(delay_count_ % 100 == 0)
+        Sleep(delay_);
+    if(loss_count_ % loss_num_ != 0)
+    {
+        if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
+            return RC::SOCK_ERROR;
+    }
     print_mutex_.lock();
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_GREEN);
     cout << dec << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq 

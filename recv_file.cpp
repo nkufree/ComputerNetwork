@@ -5,7 +5,7 @@
 #include <thread>
 using namespace std;
 
-RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), recvWindow_(BUFF_SIZE, WINDOW_SIZE)
+RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), recvWindow_(BUFF_SIZE, RECV_WINDOW_SIZE)
 {
 }
 
@@ -169,7 +169,7 @@ RC RecvFile::wait_and_send()
             }
             // recvWindow_.printSliding();
             gettimeofday(&end, NULL);
-            if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
+            // if(TIMEVAL_GAP(end, start) > DELAY_ACK_TIME)
             {
                 RC rc;
                 // sendMsg_->head.ack = seq + 1;

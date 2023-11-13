@@ -6,7 +6,7 @@
 
 using namespace std;
 
-SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), sendWindow_(BUFF_SIZE, WINDOW_SIZE)
+SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort) : FileTrans(sendAddr, recvAddr, sendPort, recvPort), sendWindow_(BUFF_SIZE, SEND_WINDOW_SIZE)
 {
 }
 
@@ -275,7 +275,7 @@ void SendFile::waitACK(SendFile* sf)
         sf->recvMsg(len);
         if(sf->recvMsg_->head.flag != ACK)
             continue;
-        sw.setWindow(sf->recvMsg_->head.win);
+        sw.setWindow(SEND_WINDOW_SIZE);
         if(sf->recvMsg_->head.ack != ack_last)
         {
             ack_last = sf->recvMsg_->head.ack;
@@ -348,6 +348,7 @@ RC SendFile::start()
     thread wait_ACK(waitACK, this);
     while(!getSendOver())
     {
+        Sleep(1);
         mutex_.lock();
         sendMsg_ = &(sendWindow_.sw_[sendWindow_.getNext()]);
         sendMsg(sendMsg_->head.len);

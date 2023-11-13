@@ -103,7 +103,7 @@ void SlidingWindow::setWindow(int size)
     // lock_guard<mutex> lock(mutex_);
     uint32_t tmp = (start_ + size) % buffSize_;
     uint32_t dif = end_ - tmp;
-    if(dif > WINDOW_SIZE)
+    if(dif > SEND_WINDOW_SIZE)
         end_ = tmp;
 }
 

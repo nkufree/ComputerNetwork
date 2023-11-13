@@ -45,6 +45,8 @@ public:
     SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort);
     static void waitACK(SendFile* sf);
     bool init();
+    void setLoss(double loss){loss_num_ = 100 / loss;}
+    void setDelay(int delay){delay_ = delay;}
     RC setFile(const char* fileName);
     RC start();
     ~SendFile()

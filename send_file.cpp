@@ -5,7 +5,7 @@
 
 using namespace std;
 
-SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
+SendFile::SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort): FileTrans()
 {
     recvAddr_.sin_family = AF_INET;
     recvAddr_.sin_addr.S_un.S_addr = inet_addr(recvAddr);
@@ -121,6 +121,7 @@ int SendFile::getSeq()
 
 RC SendFile::send_and_wait(int len)
 {
+    Sleep(1);
     timeval start, center, end;
     gettimeofday(&start, NULL);
     RC rc;

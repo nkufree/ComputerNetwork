@@ -4,7 +4,7 @@
 #include <io.h>
 using namespace std;
 
-RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
+RecvFile::RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort): FileTrans()
 {
     recvAddr_.sin_family = AF_INET;
     recvAddr_.sin_addr.S_un.S_addr = inet_addr(recvAddr);

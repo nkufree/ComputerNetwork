@@ -19,6 +19,10 @@ protected:
         F_SEND,
         F_RECV,
     } ;
+    int loss_num_;
+    int loss_count_;
+    int delay_;
+    int delay_count_;
 public:
     FileTrans(/* args */);
     RC open();

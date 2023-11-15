@@ -5,6 +5,10 @@
 using namespace std;
 FileTrans::FileTrans(/* args */)
 {
+    loss_count_ = 0;
+    delay_count_ = 0;
+    loss_num_ = 0xFFFFFFF;
+    delay_ = 0;
 }
 
 FileTrans::~FileTrans()
@@ -87,12 +91,18 @@ RC FileTrans::recvMsg(int &len)
 
 RC FileTrans::sendMsg(int len, int seq)
 {
+    loss_count_++;
+    delay_count_++;
     if(len < 0) return RC::INTERNAL;
     if(seq == -1)
         sendMsg_->head.seq = getSeq();
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.flag),len + sizeof(info) - sizeof(info::crc32));
-    if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
-        return RC::SOCK_ERROR;
+    Sleep(delay_);
+    if(loss_count_ % loss_num_ != 0)
+    {
+        if(sendto(sock_, (char*)(sendMsg_), len + sizeof(info), 0, (sockaddr*)&sendAddr_, sizeof(sendAddr_)) == -1)
+            return RC::SOCK_ERROR;
+    }
     cout << "[ send ] [ seq ] = " << (int)sendMsg_->head.seq << " [ flag ] = 0x" << hex << (int)sendMsg_->head.flag << " [ len ] = " << dec << len << " [ state ] = " << stateName[state_] << endl;
     switch(state_)
     {

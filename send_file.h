@@ -30,6 +30,8 @@ public:
     bool init();
     RC setFile(const char* fileName);
     RC start();
+    void setLoss(double loss){loss_num_ = 100 / loss;}
+    void setDelay(int delay){delay_ = delay;}
     ~SendFile()
     {
         if(sendMsg_ != nullptr) delete sendMsg_;

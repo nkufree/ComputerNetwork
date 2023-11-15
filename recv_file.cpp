@@ -159,6 +159,9 @@ RC RecvFile::wait_and_send()
         LOG_MSG(rc, "", "与发送方断开连接");
         if(recvMsg_->head.flag == PSH)
         {
+            timeval tmp;
+            gettimeofday(&tmp, NULL);
+            info_.push_back(pair(tmp, recvWindow_.getNext()));
             uint32_t &seq = recvMsg_->head.seq;
             // cout << "seq : " << seq << " nextseq : " << recvWindow_.getNextSeq() << endl;
             if(seq == recvWindow_.getNextSeq())
@@ -240,7 +243,9 @@ RC RecvFile::start()
     rc = recv_file_name();
     if(rc != RC::SUCCESS)
         return rc;
-    
+    timeval file_start;
+    gettimeofday(&file_start, NULL);
+    info_.push_back(pair(file_start, 0));
     sendMsg_->head.flag = ACK;
     thread write_in_disk(writeInDisk, this);
     rc = wait_and_send();
@@ -249,5 +254,15 @@ RC RecvFile::start()
         return rc;
     gettimeofday(&end_, NULL);
     cout << "接收等待时长为 " << end_.tv_sec - start_.tv_sec + (end_.tv_usec - start_.tv_usec) / 1000000.0 << " s" << endl;
+    calcInfo();
     return RC::SUCCESS;
+}
+
+void RecvFile::calcInfo()
+{
+    timeval file_start = info_.begin()->first;
+    for(auto p : info_)
+    {
+        
+    }
 }

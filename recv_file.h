@@ -14,6 +14,7 @@ private:
     std::ofstream recvFileStream_;
     SlidingWindow recvWindow_;
     volatile std::atomic_bool recv_over_;
+    std::vector<std::pair<timeval, int>> info_;
     // std::mutex over_mutex_;
     RC init_connect();
     RC recv_file_name();
@@ -29,6 +30,7 @@ private:
     static void writeInDisk(RecvFile* rf);
     RC wait_and_send();
     RC disconnect();
+    void calcInfo();
 
 public:
     RecvFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort);

@@ -161,7 +161,7 @@ RC RecvFile::wait_and_send()
         {
             timeval tmp;
             gettimeofday(&tmp, NULL);
-            info_.push_back(pair(tmp, recvWindow_.getNext()));
+            info_.push_back(pair(tmp, recvWindow_.getNext() - recvWindow_.getLossNum()));
             uint32_t &seq = recvMsg_->head.seq;
             recvWindow_.updateMsg(recvMsg_);
             // recvWindow_.printAckQuene();

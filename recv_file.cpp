@@ -260,9 +260,15 @@ RC RecvFile::start()
 
 void RecvFile::calcInfo()
 {
-    timeval file_start = info_.begin()->first;
+    timeval last_time = info_.begin()->first;
+    int last_num = 0;
+    ofstream tuntu("throughput.csv");
+    tuntu << "延时(ms),吞吐率(Mbps)" << endl;
     for(auto p : info_)
     {
-        
+        int time_us = (p.first.tv_sec - last_time.tv_sec) * 1000000 + p.first.tv_usec - last_time.tv_usec;
+        tuntu << time_us / 1000.0 << "," << (p.second - last_num) * 8.0 * MSS/ time_us << endl;
+        last_time = p.first;
+        last_num = p.second;
     }
 }

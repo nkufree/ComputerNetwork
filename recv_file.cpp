@@ -159,6 +159,9 @@ RC RecvFile::wait_and_send()
         LOG_MSG(rc, "", "与发送方断开连接");
         if(recvMsg_->head.flag == PSH)
         {
+            timeval tmp;
+            gettimeofday(&tmp, NULL);
+            info_.push_back(pair(tmp, recvWindow_.getNext()));
             uint32_t &seq = recvMsg_->head.seq;
             recvWindow_.updateMsg(recvMsg_);
             // recvWindow_.printAckQuene();
@@ -239,11 +242,30 @@ RC RecvFile::start()
     recv_over_ = false;
     sendMsg_->head.flag = ACK;
     thread write_in_disk(writeInDisk, this);
+    timeval file_start;
+    gettimeofday(&file_start, NULL);
+    info_.push_back(pair(file_start, 0));
     rc = wait_and_send();
     write_in_disk.join();
     if(rc != RC::SUCCESS)
         return rc;
     gettimeofday(&end_, NULL);
     cout << "接收等待时长为 " << end_.tv_sec - start_.tv_sec + (end_.tv_usec - start_.tv_usec) / 1000000.0 << " s" << endl;
+    calcInfo();
     return RC::SUCCESS;
+}
+
+void RecvFile::calcInfo()
+{
+    timeval last_time = info_.begin()->first;
+    int last_num = 0;
+    ofstream tuntu("throughput.csv");
+    tuntu << "延时(ms),吞吐率(Mbps)" << endl;
+    for(auto p : info_)
+    {
+        int time_us = (p.first.tv_sec - last_time.tv_sec) * 1000000 + p.first.tv_usec - last_time.tv_usec;
+        tuntu << time_us / 1000.0 << "," << (p.second - last_num) * 8.0 * MSS/ time_us << endl;
+        last_time = p.first;
+        last_num = p.second;
+    }
 }

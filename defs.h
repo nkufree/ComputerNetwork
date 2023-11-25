@@ -25,6 +25,7 @@
 #define KEEP_ALIVE_TIME 50 // 零窗口发送报文时间
 #define DELAY_ACK_TIME 100  // 延迟发送ACK时间
 #define WRITE_FILE_TIME 200 // 将数据写入文件的间隔时间
+#define RESEND_TIME 200
 
 enum class RC   // 错误类型
 {
@@ -68,6 +69,7 @@ struct info
     WORD len;
     WORD flag;
     WORD win;
+    timeval time;
 };
 struct fileMessage
 {

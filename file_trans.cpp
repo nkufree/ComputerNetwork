@@ -2,6 +2,7 @@
 #include <iostream>
 #include "crc32.h"
 #include <windows.h>
+#include <sys/time.h>
 
 using namespace std;
 FileTrans::FileTrans(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort)
@@ -144,6 +145,7 @@ RC FileTrans::sendMsg(int len, int seq)
     sendMsg_->head.ack = getAck();
     sendMsg_->head.win = getWin();
     sendMsg_->head.crc32 = crc32((unsigned char*)&(sendMsg_->head.seq),len + sizeof(info) - sizeof(info::crc32));
+    gettimeofday(&sendMsg_->head.time, NULL);
     if(delay_count_ % 100 == 0)
         Sleep(delay_);
     if(loss_count_ % loss_num_ != 0)

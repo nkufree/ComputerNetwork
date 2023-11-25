@@ -44,6 +44,7 @@ private:
 public:
     SendFile(const char* sendAddr, const char* recvAddr, int sendPort, int recvPort);
     static void waitACK(SendFile* sf);
+    static void checkTime(SendFile* sf);
     bool init();
     void setLoss(double loss){loss_num_ = 100 / loss;}
     void setDelay(int delay){delay_ = delay;}

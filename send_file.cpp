@@ -302,6 +302,27 @@ void SendFile::waitACK(SendFile* sf)
     }
 }
 
+void SendFile::checkTime(SendFile* sf)
+{
+    SlidingWindow& sw = sf->sendWindow_;
+    while (!sf->getSendOver())
+    {
+        int s = sw.getStart();
+        int n = sw.getNext();
+        for(int i = s; i < n; i++)
+        {
+            timeval curr;
+            gettimeofday(&curr, NULL);
+            if(TIMEVAL_GAP(curr, sw.sw_[i].head.time) > RESEND_TIME)
+            {
+                sw.setPos(S_NEXT, i);
+                break;
+            }
+        }
+        Sleep(200);
+    }
+}
+
 void SendFile::setSendBuf()
 {
     int wait_set_len = fileSize_;
@@ -346,6 +367,7 @@ RC SendFile::start()
         return RC::INTERNAL;
     setSendBuf();
     thread wait_ACK(waitACK, this);
+    thread check_time(checkTime, this);
     while(!getSendOver())
     {
         Sleep(1);
@@ -374,6 +396,7 @@ RC SendFile::start()
         }
     }
     wait_ACK.join();
+    check_time.join();
     int try_disconnect = 0;
     while(disconnect() != RC::SUCCESS)
     {

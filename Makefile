@@ -1,9 +1,10 @@
-CXXFLAGS = -std=c++17 -O2 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g -pthread -static
+CXXFLAGS = -MMD -std=c++17 -O2 -lwsock32 -finput-charset=UTF-8 -fexec-charset=GBK -fdiagnostics-color=always -g -pthread -static
 CXX = g++
 SRC = $(wildcard *.cpp)
 TEMP = ./build/
 OBJ = $(patsubst %cpp, $(TEMP)%o, $(SRC))
 TARGET = main
+-include *.d
 
 .PHONY: all create_dir clean
 
@@ -19,7 +20,7 @@ create_dir:
 	@if not exist $(TEMP) mkdir "$(TEMP)"
 
 clean:
-	del /s /q *.o
+	del /s /q *.o *.d
 
 # 变 量 	含 义
 # $* 		表示目标文件的名称，不包含目标文件的扩展名
